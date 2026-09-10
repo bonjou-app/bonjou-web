@@ -34,7 +34,9 @@ type Middleware = (
 export default defineConfig({
   plugins: [react(), rewrites()],
   build: {
-    rollupOptions: {
+    // Preserve Vite 6's syntax targets across the bundler upgrade.
+    target: ["es2020", "chrome87", "edge88", "firefox78", "safari14"],
+    rolldownOptions: {
       input: {
         // One entry. "/" is served by index.html directly; vercel.json only
         // rewrites the client routes "/app" and "/r/{code}" onto it. An

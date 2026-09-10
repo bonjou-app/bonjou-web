@@ -16,26 +16,26 @@
   "dependencies": {
     "@noble/curves": "^2.2.0",
     "@radix-ui/react-dialog": "^1.1.23",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "lucide-react": "^0.468.0",
     "material-icon-theme": "^5.37.0",
     "qrcode.react": "^4.2.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "sonner": "^2.0.8",
     "vaul": "^1.1.2",
-    "vite": "^6.3.5"
+    "vite": "^8.3.0"
   },
   "devDependencies": {
     "@resvg/resvg-js": "2.6.2",
-    "@types/node": "^26.1.2",
-    "@types/react": "^18.3.23",
-    "@types/react-dom": "^18.3.7",
-    "playwright": "^1.62.1",
+    "@types/node": "^26.5.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "playwright": "^1.63.0",
     "typescript": "^5.8.3",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.0"
   },
   "engines": {
     "node": "24.x"
