@@ -47,6 +47,7 @@ imports it. Apply relevant skills and engineering practices by default.
 - Deploy from the repository root using `vercel.json`; preserve its rewrites and service-worker headers.
 - Use the existing Bonjou Vercel project and domain. Validate a preview before promoting it when changing deployment configuration.
 - Keep fork-PR CI free of production secrets. Review dependency and GitHub Actions updates, and preserve immutable action/source pins.
+- Review dependency updates before merging. Keep React, React DOM, and their type packages together, and upgrade Vite with its React plugin. Preserve browser build targets during bundler upgrades, and verify install, tests, build, and an app preview without bypassing peer dependency checks.
 
 ## Links
 
