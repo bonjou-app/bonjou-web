@@ -22,7 +22,7 @@
     "lucide-react": "^0.468.0",
     "material-icon-theme": "^5.37.0",
     "qrcode.react": "^4.2.0",
-    "react": "^18.3.1",
+    "react": "^19.2.8",
     "react-dom": "^18.3.1",
     "sonner": "^2.0.8",
     "vaul": "^1.1.2",
@@ -31,7 +31,7 @@
   "devDependencies": {
     "@resvg/resvg-js": "2.6.2",
     "@types/node": "^26.1.2",
-    "@types/react": "^18.3.23",
+    "@types/react": "^19.2.18",
     "@types/react-dom": "^18.3.7",
     "playwright": "^1.62.1",
     "typescript": "^5.8.3",
