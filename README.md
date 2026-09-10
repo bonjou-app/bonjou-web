@@ -66,6 +66,11 @@ Use the repository root as the Vercel project root. `vercel.json` defines
 headers. Keep `bonjou.vercel.app` on the existing Vercel project when changing
 the connected Git repository.
 
+The existing Vercel project is connected to `bonjou-app/bonjou-web`. Pull
+requests receive preview deployments, and merges to the protected `main` branch
+deploy production after the required web CI passes. The Vercel GitHub app has
+access to this repository only.
+
 Treat `VITE_*` configuration and browser bundles as public. Store service
 credentials in deployment secret storage; keep end-to-end encryption keys on
 clients. The Go relay forwards opaque content and has a separate deployment.
