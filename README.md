@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/brand/bonjou-mark.svg" alt="Bonjou logo" width="96" height="96" />
+</p>
+
 # Bonjou Web
 
 The Bonjou marketing website and browser app for encrypted chat and file sharing.

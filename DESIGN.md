@@ -73,6 +73,29 @@ is a distraction. Body measure caps around 65ch.
 
 ## Iconography
 
+### Bonjou logo
+
+The approved mark is a rounded lowercase **b**, with two connected peer shapes
+cut out of its bowl. Preserve its silhouette, diagonal connection, and open
+negative space. Use a flat vermilion fill (`#F83A27` for exported sRGB assets),
+with no gradient, texture, shadow, or extra symbol. UI colors still use the
+existing tokens; the logo has a fixed brand color in both themes.
+
+`src/share/brandMark.json` is the canonical geometry and export palette.
+`Logo.tsx` reads it directly. Run `npm run generate:brand` after changing it to
+regenerate the SVG, transparent PNG, padded avatar, and browser icons under
+`public/`. The renderer is a development dependency; normal builds use the
+committed assets. The padded avatar uses a charcoal background and fits inside
+both square and circular profile crops. The transparent mark works on both
+light and dark surfaces. Keep the lowercase Geist wordmark beside the UI mark.
+
+The CLI repository's `docs/assets/bonjou-mark.svg` and `docs/assets/logo.png`,
+and the organization profile's `profile/assets/`, are copies of these exports.
+Update those copies together when the approved mark changes. Check the 16px
+and 32px icons, both themes, and the mobile masthead before publishing.
+
+### Interface and file icons
+
 Two sets, doing two different jobs.
 
 **Lucide** draws every control: search, settings, theme, close, attach,
