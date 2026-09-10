@@ -14,7 +14,7 @@
     "check:protocol": "node scripts/check-protocol-vectors.mjs"
   },
   "dependencies": {
-    "@noble/curves": "^2.2.0",
+    "@noble/curves": "^2.4.0",
     "@radix-ui/react-dialog": "^1.1.23",
     "@vitejs/plugin-react": "^6.1.1",
     "clsx": "^2.1.1",
