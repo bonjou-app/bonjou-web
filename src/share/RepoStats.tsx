@@ -10,7 +10,7 @@ import { GitFork, Github, Star, Tag } from "lucide-react";
  * paints immediately instead of flashing empty.
  */
 
-const REPO = "hamzaabdulwahab/bonjou-cli";
+const REPO = "bonjou-app/bonjou-cli";
 const CACHE_KEY = "bonjou.repoStats.v2";
 const CACHE_MS = 30 * 60 * 1000;
 

@@ -1,0 +1,6 @@
+{
+  "repository": "bonjou-app/bonjou-cli",
+  "revision": "abe15331c3958c2ec98adb0c33e1e2413ff44f12",
+  "path": "internal/network/testdata/protocol-v2.json",
+  "sha256": "fa76d6b2447dc7f75aa78b0b79bce2aed8a1d1861f022668e37abee95e7284e1"
+}

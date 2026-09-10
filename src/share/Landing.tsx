@@ -31,7 +31,8 @@ import { RepoStats } from "./RepoStats";
 import { formatBytes } from "./transfer";
 import type { useSession } from "./useSession";
 
-const REPO = "https://github.com/hamzaabdulwahab/bonjou-cli";
+const REPO = "https://github.com/bonjou-app/bonjou-cli";
+const WEB_REPO = "https://github.com/bonjou-app/bonjou-web";
 
 const NAV = [
   { href: "#how", label: "How it works" },
@@ -530,12 +531,12 @@ export function Landing({
 
           <div className="foot-col">
             <p className="bj-label">Project</p>
-            <a href={REPO} target="_blank" rel="noopener noreferrer">
+            <a href={WEB_REPO} target="_blank" rel="noopener noreferrer">
               <Github size={12} strokeWidth={1.75} aria-hidden="true" />
               Source on GitHub
             </a>
             <a
-              href={`${REPO}/issues`}
+              href={`${WEB_REPO}/issues`}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -543,7 +544,7 @@ export function Landing({
               Report an issue
             </a>
             <a
-              href={`${REPO}/blob/main/README.md`}
+              href={`${WEB_REPO}/blob/main/README.md`}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -572,7 +573,7 @@ export function Landing({
           </span>
           <a
             className="foot-icon"
-            href={REPO}
+            href={WEB_REPO}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Source on GitHub"
@@ -581,7 +582,7 @@ export function Landing({
           </a>
           <a
             className="foot-icon"
-            href={`${REPO}/issues`}
+            href={`${WEB_REPO}/issues`}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Report an issue"

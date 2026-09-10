@@ -2,13 +2,12 @@ import { chromium } from "playwright";
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "node:url";
 
-const PORT = 5173;
+const ROOT = fileURLToPath(new URL("../", import.meta.url));
+const PORT = Number(process.env.PORT ?? 5173);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
-const SCREENSHOT_DIR = path.join(
-  process.env.HOME || "",
-  ".gemini/antigravity-cli/brain/f37a6734-e661-4580-a66b-5dffc1505b0a/scratch/responsive_tests"
-);
+const SCREENSHOT_DIR = path.resolve(ROOT, process.env.SCREENSHOT_DIR ?? "test-results/responsive");
 
 if (!fs.existsSync(SCREENSHOT_DIR)) {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
@@ -26,7 +25,7 @@ const VIEWPORTS = [
 
 async function startServer() {
   const vite = spawn("npx", ["vite", "--port", String(PORT), "--host", "127.0.0.1"], {
-    cwd: path.resolve("website"),
+    cwd: ROOT,
     stdio: "pipe",
     shell: true,
   });

@@ -16,7 +16,7 @@
 
 import { x25519 } from "@noble/curves/ed25519.js";
 
-const RELAY = (process.env.RELAY ?? "https://bonjou.80-225-228-65.sslip.io").replace(/\/$/, "");
+const RELAY = (process.env.RELAY ?? "http://127.0.0.1:46330").replace(/\/$/, "");
 const WS_URL = `${RELAY.replace(/^http/, "ws")}/ws`;
 const SIZE_MB = Number(process.env.SIZE_MB ?? 12);
 const PAYLOAD_BYTES = Math.round(SIZE_MB * 1024 * 1024);
@@ -173,7 +173,8 @@ async function main() {
   check("second peer joined", joined.code === created.code);
 
   const roster = await alice.expect(
-    (f) => f.type === "roster" && f.peers.length === 2, "roster with two peers",
+    (f) => f.type === "roster" && f.peers?.some((peer) => peer.id === bob.selfId),
+    "roster containing the other peer",
   );
   const bobEntry = roster.peers.find((p) => p.id === bob.selfId);
   check("roster carries the peer public key", bobEntry?.pubkey === hex(bob.keypair.publicKey));
