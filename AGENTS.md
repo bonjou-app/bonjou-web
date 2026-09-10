@@ -20,6 +20,7 @@ imports it. Apply relevant skills and engineering practices by default.
 - This public repository contains the marketing site and browser app. Its sibling `bonjou-app/bonjou-cli` contains the Go CLI, Go relay, and canonical protocol vectors. Each repository builds independently; there is no required parent checkout or submodule.
 - One React application serves `/`, `/app`, `/r/{code}`, and the `/share` compatibility route. Preserve the shared session and one active session per browser.
 - Read `PRODUCT.md` and `DESIGN.md` for product language, tokens, themes, and accessibility. Keep design tokens in `src/share/tokens.css`; use existing components before adding dependencies.
+- Preserve the approved Bonjou logo in `src/share/brandMark.json`. Regenerate exports with `npm run generate:brand` and follow the logo section in `DESIGN.md` when updating copies in the CLI and organization profile repositories.
 - The relay is an opaque forwarding service. Never move client encryption keys, decryption, or user payload storage to the relay.
 
 ## Commands and verification
