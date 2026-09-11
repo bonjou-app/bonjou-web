@@ -1,10 +1,16 @@
 import { useState } from "react";
-import {
-  ArrowDownToLine,
-  FileText,
-  SquareChevronRight,
-} from "lucide-react";
+import { DownloadSimple as ArrowDownToLine } from "@phosphor-icons/react/dist/csr/DownloadSimple";
+import { FileText } from "@phosphor-icons/react/dist/csr/FileText";
+import { TerminalWindow as SquareChevronRight } from "@phosphor-icons/react/dist/csr/TerminalWindow";
 
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TerminalDisplay } from "./TerminalDisplay";
 
 /**
@@ -140,30 +146,31 @@ export function Install() {
     platform.id === "windows" ? "PowerShell Verification" : "Verification";
 
   return (
-    <div className="install">
-      <div className="install-tabs" role="tablist" aria-label="Operating system">
+    <Tabs value={active} onValueChange={setActive} className="install">
+      <TabsList
+        className="install-tabs group-data-horizontal/tabs:h-11 mb-6 max-w-full"
+        aria-label="Operating system"
+      >
         {PLATFORMS.map((entry) => (
-          <button
+          <TabsTrigger
             key={entry.id}
-            type="button"
-            role="tab"
-            aria-selected={entry.id === active}
-            onClick={() => setActive(entry.id)}
+            value={entry.id}
+            className="h-9 px-5 max-[420px]:px-3"
           >
             {entry.label}
-          </button>
+          </TabsTrigger>
         ))}
-      </div>
+      </TabsList>
 
-      <div className="install-grid">
+      <TabsContent value={platform.id} className="install-grid">
         <div className="install-main">
           <div className="recipe-head">
             <span className="recipe-name">{platform.primary.name}</span>
             {platform.primary.badge ? (
-              <span className="recipe-badge">
+              <Badge variant="outline" className="recipe-badge">
                 <span className="recipe-badge-dot" aria-hidden="true" />
                 {platform.primary.badge}
-              </span>
+              </Badge>
             ) : null}
           </div>
 
@@ -176,51 +183,32 @@ export function Install() {
 
           <p className="recipe-why">{platform.primary.why}</p>
 
-          <p className="bj-label is-spaced">Other ways</p>
-          {platform.alternatives.map((alt) => (
-            <div className="recipe" key={alt.name}>
-              <div className="recipe-head">
-                <span className="recipe-name">{alt.name}</span>
-              </div>
-              <TerminalDisplay
-                command={alt.command}
-                osLabel={platform.label}
-                shellType={alt.name}
-                prompt={alt.link ? undefined : platform.prompt}
-                isLink={alt.link}
-              />
-              <p className="recipe-why">{alt.why}</p>
-            </div>
-          ))}
+          <Accordion type="single" collapsible className="install-alternatives">
+            <AccordionItem value="alternatives">
+              <AccordionTrigger>Other ways to install</AccordionTrigger>
+              <AccordionContent>
+                {platform.alternatives.map((alt) => (
+                  <div className="recipe" key={alt.name}>
+                    <div className="recipe-head">
+                      <span className="recipe-name">{alt.name}</span>
+                    </div>
+                    <TerminalDisplay
+                      command={alt.command}
+                      osLabel={platform.label}
+                      shellType={alt.name}
+                      prompt={alt.link ? undefined : platform.prompt}
+                      isLink={alt.link}
+                    />
+                    <p className="recipe-why">{alt.why}</p>
+                  </div>
+                ))}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
 
         <aside className="install-side">
-          <p className="bj-label">Which should I pick?</p>
-          <ol className="picker">
-            <li>
-              <span className="picker-num">01</span>
-              <p>
-                <strong>Already use a package manager?</strong> Use it. Upgrades
-                then arrive with everything else you upgrade.
-              </p>
-            </li>
-            <li>
-              <span className="picker-num">02</span>
-              <p>
-                <strong>Want it working in ten seconds?</strong> The script. It
-                is short enough to read first, and you should.
-              </p>
-            </li>
-            <li>
-              <span className="picker-num">03</span>
-              <p>
-                <strong>On a locked-down machine?</strong> Take the binary. It
-                needs no installer and no admin rights.
-              </p>
-            </li>
-          </ol>
-
-          <p className="bj-label is-spaced">Then check it landed</p>
+          <p className="bj-label is-spaced">Ready to go</p>
           <TerminalDisplay
             command={`bonjou --version\nbonjou`}
             osLabel={platform.label}
@@ -228,8 +216,8 @@ export function Install() {
             prompt={platform.prompt}
           />
           <p className="recipe-why">
-            The second one starts it. Anyone else running bonjou on the same
-            network appears within a second or two.
+            The first command checks your install. The second opens Bonjou. Run
+            it on another computer on your network to start sharing.
           </p>
 
           <div className="install-links">
@@ -238,7 +226,11 @@ export function Install() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <FileText size={13} strokeWidth={1.75} aria-hidden="true" />
+              <FileText
+                size={18}
+                className="size-[1.125rem]"
+                aria-hidden="true"
+              />
               Full install guide
             </a>
             <a
@@ -246,20 +238,24 @@ export function Install() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <SquareChevronRight size={13} strokeWidth={1.75} aria-hidden="true" />
+              <SquareChevronRight
+                size={18}
+                className="size-[1.125rem]"
+                aria-hidden="true"
+              />
               Command reference
             </a>
-            <a
-              href={RELEASES}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <ArrowDownToLine size={13} strokeWidth={1.75} aria-hidden="true" />
+            <a href={RELEASES} target="_blank" rel="noopener noreferrer">
+              <ArrowDownToLine
+                size={18}
+                className="size-[1.125rem]"
+                aria-hidden="true"
+              />
               All releases and checksums
             </a>
           </div>
         </aside>
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }

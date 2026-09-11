@@ -54,11 +54,11 @@ const CRC_TABLE = (() => {
 
 /** Running CRC32. Feed the previous result back in as `seed`. */
 export function crc32(bytes: Uint8Array, seed = 0): number {
-  let c = (~seed) >>> 0;
+  let c = ~seed >>> 0;
   for (let i = 0; i < bytes.length; i++) {
     c = (CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8)) >>> 0;
   }
-  return (~c) >>> 0;
+  return ~c >>> 0;
 }
 
 /**
@@ -66,11 +66,26 @@ export function crc32(bytes: Uint8Array, seed = 0): number {
  * needs 4 GiB of input, so without a seam it would ship unexercised,
  * which is how a rarely-taken branch stays broken for years.
  */
-function needsZip64(entries: ZipEntry[], payloadTotal: number, force = false): boolean {
+function needsZip64(
+  entries: ZipEntry[],
+  payloadTotal: number,
+  force = false,
+): boolean {
+  const directoryOffset =
+    payloadTotal +
+    entries.reduce(
+      (total, entry) => total + 30 + encoder.encode(entry.name).length + 16,
+      0,
+    );
+  const directorySize = entries.reduce(
+    (total, entry) => total + 46 + encoder.encode(entry.name).length,
+    0,
+  );
   return (
     force ||
     entries.length >= U16_MAX ||
-    payloadTotal >= U32_MAX ||
+    directoryOffset >= U32_MAX ||
+    directorySize >= U32_MAX ||
     entries.some((entry) => entry.size >= U32_MAX)
   );
 }
@@ -172,133 +187,142 @@ export function zipStream(
 
   const placed: Placed[] = [];
   let offset = 0;
-  let index = 0;
+  async function* segments(): AsyncGenerator<Uint8Array> {
+    for (const entry of entries) {
+      const name = encoder.encode(entry.name);
+      const { time, date } = dosStamp(entry.lastModified);
+      const start = offset;
 
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      if (index < entries.length) {
-        const entry = entries[index];
-        const name = encoder.encode(entry.name);
-        const { time, date } = dosStamp(entry.lastModified);
-        const start = offset;
-
-        const head = new Writer();
-        head.u32(LOCAL_SIG);
-        head.u16(version);
-        head.u16(FLAG_DESCRIPTOR | FLAG_UTF8);
-        head.u16(0); // stored
-        head.u16(time);
-        head.u16(date);
-        head.u32(0); // crc, in the descriptor
-        head.u32(0); // compressed size, in the descriptor
-        head.u32(0); // uncompressed size, in the descriptor
-        head.u16(name.length);
-        head.u16(zip64 ? 20 : 0);
-        head.raw(name);
-        if (zip64) {
-          head.u16(0x0001);
-          head.u16(16);
-          head.u64(0);
-          head.u64(0);
-        }
-        const header = head.done();
-        controller.enqueue(header);
-        offset += header.length;
-
-        let crc = 0;
-        for (let at = 0; at < entry.size; at += chunkSize) {
-          const slice = entry.data.slice(at, Math.min(at + chunkSize, entry.size));
-          const bytes = new Uint8Array(await slice.arrayBuffer());
-          crc = crc32(bytes, crc);
-          controller.enqueue(bytes);
-          offset += bytes.length;
-        }
-
-        const tail = new Writer();
-        tail.u32(DESCRIPTOR_SIG);
-        tail.u32(crc);
-        if (zip64) {
-          tail.u64(entry.size);
-          tail.u64(entry.size);
-        } else {
-          tail.u32(entry.size);
-          tail.u32(entry.size);
-        }
-        const descriptor = tail.done();
-        controller.enqueue(descriptor);
-        offset += descriptor.length;
-
-        placed.push({ name, crc, size: entry.size, offset: start, time, date });
-        index++;
-        return;
-      }
-
-      // Central directory, then the end records.
-      const dirStart = offset;
-      const dir = new Writer();
-      for (const entry of placed) {
-        dir.u32(CENTRAL_SIG);
-        dir.u16(version);
-        dir.u16(version);
-        dir.u16(FLAG_DESCRIPTOR | FLAG_UTF8);
-        dir.u16(0);
-        dir.u16(entry.time);
-        dir.u16(entry.date);
-        dir.u32(entry.crc);
-        dir.u32(zip64 ? U32_MAX : entry.size);
-        dir.u32(zip64 ? U32_MAX : entry.size);
-        dir.u16(entry.name.length);
-        dir.u16(zip64 ? 28 : 0);
-        dir.u16(0); // comment
-        dir.u16(0); // disk
-        dir.u16(0); // internal attrs
-        dir.u32(0); // external attrs
-        dir.u32(zip64 ? U32_MAX : entry.offset);
-        dir.raw(entry.name);
-        if (zip64) {
-          dir.u16(0x0001);
-          dir.u16(24);
-          dir.u64(entry.size);
-          dir.u64(entry.size);
-          dir.u64(entry.offset);
-        }
-      }
-
-      const dirBytes = dir.done();
-      const end = new Writer();
-      end.raw(dirBytes);
-
+      const head = new Writer();
+      head.u32(LOCAL_SIG);
+      head.u16(version);
+      head.u16(FLAG_DESCRIPTOR | FLAG_UTF8);
+      head.u16(0); // stored
+      head.u16(time);
+      head.u16(date);
+      head.u32(0); // crc, in the descriptor
+      head.u32(0); // compressed size, in the descriptor
+      head.u32(0); // uncompressed size, in the descriptor
+      head.u16(name.length);
+      head.u16(zip64 ? 20 : 0);
+      head.raw(name);
       if (zip64) {
-        end.u32(ZIP64_EOCD_SIG);
-        end.u64(44); // size of this record, less its first 12 bytes
-        end.u16(version);
-        end.u16(version);
-        end.u32(0);
-        end.u32(0);
-        end.u64(placed.length);
-        end.u64(placed.length);
-        end.u64(dirBytes.length);
-        end.u64(dirStart);
+        head.u16(0x0001);
+        head.u16(16);
+        head.u64(0);
+        head.u64(0);
+      }
+      const header = head.done();
+      yield header;
+      offset += header.length;
 
-        end.u32(ZIP64_LOCATOR_SIG);
-        end.u32(0);
-        end.u64(dirStart + dirBytes.length);
-        end.u32(1);
+      let crc = 0;
+      for (let at = 0; at < entry.size; at += chunkSize) {
+        const slice = entry.data.slice(
+          at,
+          Math.min(at + chunkSize, entry.size),
+        );
+        const bytes = new Uint8Array(await slice.arrayBuffer());
+        crc = crc32(bytes, crc);
+        yield bytes;
+        offset += bytes.length;
       }
 
-      end.u32(EOCD_SIG);
-      end.u16(0);
-      end.u16(0);
-      end.u16(zip64 ? U16_MAX : placed.length);
-      end.u16(zip64 ? U16_MAX : placed.length);
-      end.u32(zip64 ? U32_MAX : dirBytes.length);
-      end.u32(zip64 ? U32_MAX : dirStart);
-      end.u16(0);
+      const tail = new Writer();
+      tail.u32(DESCRIPTOR_SIG);
+      tail.u32(crc);
+      if (zip64) {
+        tail.u64(entry.size);
+        tail.u64(entry.size);
+      } else {
+        tail.u32(entry.size);
+        tail.u32(entry.size);
+      }
+      const descriptor = tail.done();
+      yield descriptor;
+      offset += descriptor.length;
 
-      controller.enqueue(end.done());
-      controller.close();
+      placed.push({ name, crc, size: entry.size, offset: start, time, date });
+    }
+
+    // Central directory, then the end records.
+    const dirStart = offset;
+    const dir = new Writer();
+    for (const entry of placed) {
+      dir.u32(CENTRAL_SIG);
+      dir.u16(version);
+      dir.u16(version);
+      dir.u16(FLAG_DESCRIPTOR | FLAG_UTF8);
+      dir.u16(0);
+      dir.u16(entry.time);
+      dir.u16(entry.date);
+      dir.u32(entry.crc);
+      dir.u32(zip64 ? U32_MAX : entry.size);
+      dir.u32(zip64 ? U32_MAX : entry.size);
+      dir.u16(entry.name.length);
+      dir.u16(zip64 ? 28 : 0);
+      dir.u16(0); // comment
+      dir.u16(0); // disk
+      dir.u16(0); // internal attrs
+      dir.u32(0); // external attrs
+      dir.u32(zip64 ? U32_MAX : entry.offset);
+      dir.raw(entry.name);
+      if (zip64) {
+        dir.u16(0x0001);
+        dir.u16(24);
+        dir.u64(entry.size);
+        dir.u64(entry.size);
+        dir.u64(entry.offset);
+      }
+    }
+
+    const dirBytes = dir.done();
+    const end = new Writer();
+    end.raw(dirBytes);
+
+    if (zip64) {
+      end.u32(ZIP64_EOCD_SIG);
+      end.u64(44); // size of this record, less its first 12 bytes
+      end.u16(version);
+      end.u16(version);
+      end.u32(0);
+      end.u32(0);
+      end.u64(placed.length);
+      end.u64(placed.length);
+      end.u64(dirBytes.length);
+      end.u64(dirStart);
+
+      end.u32(ZIP64_LOCATOR_SIG);
+      end.u32(0);
+      end.u64(dirStart + dirBytes.length);
+      end.u32(1);
+    }
+
+    end.u32(EOCD_SIG);
+    end.u16(0);
+    end.u16(0);
+    end.u16(zip64 ? U16_MAX : placed.length);
+    end.u16(zip64 ? U16_MAX : placed.length);
+    end.u32(zip64 ? U32_MAX : dirBytes.length);
+    end.u32(zip64 ? U32_MAX : dirStart);
+    end.u16(0);
+
+    yield end.done();
+  }
+  const iterator = segments();
+  return new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        const { done, value } = await iterator.next();
+        if (done) controller.close();
+        else controller.enqueue(value);
+      },
+      async cancel() {
+        await iterator.return(undefined);
+      },
     },
-  });
+    { highWaterMark: 0 },
+  );
 }
 
 /**
@@ -307,7 +331,9 @@ export function zipStream(
  * segment is the folder's own name.
  */
 export function folderNameFor(files: File[]): string {
-  const first = files.find((file) => file.webkitRelativePath)?.webkitRelativePath;
+  const first = files.find(
+    (file) => file.webkitRelativePath,
+  )?.webkitRelativePath;
   const root = first?.split("/")[0]?.trim();
   return root ? `${root}.zip` : "folder.zip";
 }

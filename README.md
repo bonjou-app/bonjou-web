@@ -7,7 +7,7 @@
 The Bonjou marketing website and browser app for encrypted chat and file sharing.
 
 - [Open Bonjou](https://bonjou.vercel.app)
-- [CLI and relay source](https://github.com/bonjou-app/bonjou-cli)
+- [CLI and coordinator source](https://github.com/bonjou-app/bonjou-cli)
 - [Bonjou organization](https://github.com/bonjou-app)
 
 ## Development
@@ -40,16 +40,23 @@ network access. For an offline comparison with a local CLI checkout:
 npm run check:protocol -- /path/to/bonjou-cli
 ```
 
-To exercise a local relay, run this from the CLI repo:
+To exercise a local coordinator, run this from the CLI repo:
 
 ```sh
 go run ./cmd/bonjou-relay -origins http://127.0.0.1:5173,http://localhost:5173 -trust-proxy=false
 ```
 
-Then run `npm run smoke` here. To point the browser at the local relay, copy
-`.env.example` to `.env.local` before starting Vite. The smoke test creates two synthetic peers and
-checks key exchange, approval, and encrypted streaming. Set `RELAY` to test
-another relay you operate.
+Then run `npm run smoke` here. To point the browser at the local coordinator, copy
+`.env.example` to `.env.local` before starting Vite. The smoke test checks source-network discovery,
+room isolation, encrypted signaling, and rejection of payload endpoints. Set
+`COORDINATOR` to test another coordinator you operate. `RELAY` and
+`VITE_RELAY_URL` remain supported configuration aliases.
+
+Run `npm run e2e:ui`, `npm run e2e:lan`, `npm run e2e:workflows`,
+`npm run e2e:accessibility`, and `npm run e2e:motion` against the Vite app.
+Set `APP_URL` if it is not at `http://127.0.0.1:4173`. Allow that exact origin
+in the coordinator's `-origins` flag. Run coordinator-backed suites one at a
+time: their synthetic peers share a discovery network.
 
 ## Protocol changes
 
@@ -77,7 +84,12 @@ access to this repository only.
 
 Treat `VITE_*` configuration and browser bundles as public. Store service
 credentials in deployment secret storage; keep end-to-end encryption keys on
-clients. The Go relay forwards opaque content and has a separate deployment.
+clients. The Go coordinator forwards opaque WebRTC signaling and has a separate
+deployment. This web revision requires the signaling-only coordinator in
+`bonjou-app/bonjou-cli` branch `codex/bonjou-web-revamp-coordinator`. Deploy the
+paired coordinator before promoting this web revision. Application data
+travels over direct WebRTC; the former relay upload/download endpoints are
+not a fallback.
 
 ## Contributing and security
 

@@ -11,8 +11,6 @@ import { useCallback, useEffect, useState } from "react";
 const KEY = "bonjou.settings.v1";
 
 export interface Settings {
-  /** Show "direct" or "relayed" on finished transfers. */
-  routeTags: boolean;
   /** Tighter rows, for people watching a busy room on a small screen. */
   compact: boolean;
   /** A system notification when somebody offers you a file. */
@@ -20,7 +18,6 @@ export interface Settings {
 }
 
 const DEFAULTS: Settings = {
-  routeTags: true,
   compact: false,
   notifyOffers: false,
 };
@@ -83,7 +80,7 @@ export function notifyOffer(from: string, name: string): void {
   if (document.visibilityState === "visible") return;
   try {
     new Notification(`${from} is offering a file`, {
-      body: `${name} — nothing downloads until you approve it.`,
+      body: `${name}. Nothing downloads until you approve it.`,
       icon: "/favicon.svg",
       tag: "bonjou-offer",
     });

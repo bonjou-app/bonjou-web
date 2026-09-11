@@ -1,5 +1,9 @@
-import { useEffect, useState } from "react";
-import { ArrowDownToLine, Check, Copy } from "lucide-react";
+import { DownloadSimple as ArrowDownToLine } from "@phosphor-icons/react/dist/csr/DownloadSimple";
+import { TerminalWindow } from "@phosphor-icons/react/dist/csr/TerminalWindow";
+
+import { CopyButton } from "@/components/interior/copy-button";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export interface TerminalDisplayProps {
   /** The shell command string or download URL */
@@ -29,24 +33,10 @@ export function TerminalDisplay({
   isLink = false,
   className = "",
 }: TerminalDisplayProps) {
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
-  const handleCopy = () => {
-    if (isLink) return;
-    void navigator.clipboard.writeText(command).then(() => {
-      setCopied(true);
-    });
-  };
-
   const defaultPrompt =
     prompt ??
-    (osLabel.toLowerCase() === "windows" || shellType?.toLowerCase() === "powershell"
+    (osLabel.toLowerCase() === "windows" ||
+    shellType?.toLowerCase() === "powershell"
       ? "PS>"
       : "$");
 
@@ -59,53 +49,51 @@ export function TerminalDisplay({
   const lines = command.split("\n");
 
   return (
-    <div className={`terminal ${className}`.trim()}>
-      <div className="terminal-bar">
-        <div className="terminal-controls">
-          <span className="terminal-dot is-close" aria-hidden="true" />
-          <span className="terminal-dot is-minimize" aria-hidden="true" />
-          <span className="terminal-dot is-maximize" aria-hidden="true" />
-          <span className="terminal-label">{title}</span>
-        </div>
+    <Card className={`terminal mb-3 gap-0 p-0 ${className}`.trim()}>
+      <CardHeader className="terminal-bar flex items-center gap-2 border-b px-4 py-3">
+        <TerminalWindow
+          className="size-4 shrink-0 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <span className="min-w-0 truncate text-xs text-muted-foreground">
+          {title}
+        </span>
         <span className="spacer" />
         {isLink ? (
-          <a
-            href={command}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-copy is-link-btn"
-            aria-label={`Download ${osLabel} binary release`}
-          >
-            <ArrowDownToLine size={12} strokeWidth={1.75} aria-hidden="true" />
-            Download
-          </a>
+          <Button asChild variant="outline" className="h-8 px-3">
+            <a
+              href={command}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Download ${osLabel} binary release`}
+            >
+              <ArrowDownToLine
+                size={18}
+                className="size-[1.125rem]"
+                aria-hidden="true"
+              />
+              Download
+            </a>
+          </Button>
         ) : (
-          <button
-            type="button"
-            className="btn-copy"
-            onClick={handleCopy}
-            aria-label={`Copy ${title} command`}
-          >
-            {copied ? (
-              <>
-                <Check size={12} strokeWidth={1.75} aria-hidden="true" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy size={12} strokeWidth={1.75} aria-hidden="true" />
-                Copy
-              </>
-            )}
-          </button>
+          <CopyButton
+            value={command}
+            label="Copy"
+            copiedLabel="Copied!"
+            className="h-8 px-3"
+          />
         )}
-      </div>
-      <div className="terminal-body">
+      </CardHeader>
+      <CardContent
+        className="terminal-body"
+        tabIndex={isLink ? undefined : 0}
+        role="region"
+        aria-label={`${title} command`}
+      >
         {isLink ? (
           <div className="terminal-line">
             <ArrowDownToLine
-              size={12}
-              strokeWidth={1.75}
+              size={18}
               className="recipe-glyph"
               aria-hidden="true"
             />
@@ -127,7 +115,7 @@ export function TerminalDisplay({
             </div>
           ))
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

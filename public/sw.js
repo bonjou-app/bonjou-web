@@ -8,12 +8,9 @@
  * a decrypting transform, and returns a response the browser writes
  * straight to disk.
  *
- * Ciphertext reaches it two ways. Over the relay it is an ordinary fetch.
- * Over a direct connection the bytes arrive as data-channel messages in
- * the page, which a worker cannot reach into, so the page hands over a
- * MessagePort and the worker builds a stream fed by messages on it.
- * Everything past that point is identical: same frames, same per-chunk
- * authentication, same streaming write to disk.
+ * Ciphertext arrives only through a local WebRTC data channel. The page
+ * hands the worker a MessagePort, and the worker builds a stream fed by
+ * those direct messages so the browser can write them to disk incrementally.
  *
  * Deliberately dependency-free and hand-written: it runs outside the
  * bundler, so it carries its own copy of the frame format rather than
@@ -39,7 +36,6 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("message", (event) => {
   const data = event.data;
   const port = event.ports && event.ports[0];
-  // Present only for a direct transfer, where it carries the ciphertext.
   const dataPort = event.ports && event.ports[1];
   if (!data || data.type !== "bonjou-prepare") return;
 
@@ -47,13 +43,20 @@ self.addEventListener("message", (event) => {
     if (!/^[0-9a-f]{16}$/.test(String(data.transferId))) {
       throw new Error("invalid transfer id");
     }
-    const mode = data.mode === "p2p" ? "p2p" : "relay";
-    if (mode === "p2p" && !dataPort) {
+    if (data.mode !== "p2p") {
+      throw new Error("only peer-to-peer downloads are supported");
+    }
+    if (!dataPort) {
       throw new Error("a direct transfer needs a data port");
     }
+    if (!Number.isSafeInteger(data.plaintextSize) || data.plaintextSize < 0) {
+      throw new Error("invalid file size");
+    }
+    if (!/^[0-9a-f]{64}$/.test(data.streamKeyHex))
+      throw new Error("invalid stream key");
+    if (pending.has(data.transferId))
+      throw new Error("download already prepared");
     pending.set(data.transferId, {
-      mode,
-      url: data.url,
       dataPort,
       filename: String(data.filename || "download"),
       plaintextSize: Number(data.plaintextSize) || 0,
@@ -87,56 +90,76 @@ async function handleDownload(transferId) {
   // again rather than silently re-opening a stream.
   pending.delete(transferId);
 
-  let ciphertext;
-  if (record.mode === "p2p") {
-    ciphertext = portStream(record.dataPort);
-  } else {
-    let upstream;
-    try {
-      upstream = await fetch(record.url);
-    } catch (err) {
-      return new Response(`could not reach the relay: ${err}`, {
-        status: 502,
-        headers: { "Content-Type": "text/plain" },
+  try {
+    const ciphertext = portStream(record.dataPort);
+
+    const key = await crypto.subtle.importKey(
+      "raw",
+      hexToBytes(record.streamKeyHex),
+      "AES-GCM",
+      false,
+      ["decrypt"],
+    );
+
+    const reader = ciphertext.pipeThrough(decryptingStream(key)).getReader();
+    let received = 0;
+    const reportFailure = (reason) => {
+      record.dataPort.postMessage({
+        error: String(reason?.message || reason || "Download cancelled"),
       });
-    }
-    if (!upstream.ok || !upstream.body) {
-      return new Response(`the relay refused the download (${upstream.status})`, {
-        status: 502,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }
-    ciphertext = upstream.body;
+      record.dataPort.close();
+    };
+    const plaintext = new ReadableStream({
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read();
+          if (done) {
+            if (received !== record.plaintextSize)
+              throw new Error("The file size does not match the offer.");
+            controller.close();
+            record.dataPort.postMessage({ complete: true });
+            record.dataPort.close();
+            return;
+          }
+          received += value.byteLength;
+          if (received > record.plaintextSize)
+            throw new Error("The file is larger than the offer.");
+          controller.enqueue(value);
+        } catch (error) {
+          reportFailure(error);
+          controller.error(error);
+          await reader.cancel(error).catch(() => {});
+        }
+      },
+      async cancel(reason) {
+        reportFailure(reason || "Download cancelled in your browser.");
+        await reader.cancel(reason).catch(() => {});
+      },
+    });
+
+    return new Response(plaintext, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Length": String(record.plaintextSize),
+        "Content-Disposition": contentDisposition(record.filename),
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (error) {
+    record.dataPort.postMessage({
+      error: String(error?.message || "Could not prepare the download."),
+    });
+    record.dataPort.close();
+    return new Response("Could not prepare the download.", { status: 500 });
   }
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    hexToBytes(record.streamKeyHex),
-    "AES-GCM",
-    false,
-    ["decrypt"],
-  );
-
-  const plaintext = ciphertext.pipeThrough(decryptingStream(key));
-
-  return new Response(plaintext, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/octet-stream",
-      "Content-Length": String(record.plaintextSize),
-      "Content-Disposition": contentDisposition(record.filename),
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
 }
 
 /**
  * Wraps a MessagePort as a readable stream of ciphertext, for bytes that
- * arrived over a direct connection rather than the relay.
- *
- * The relay path gets flow control free from TCP. This one has to say so
- * out loud: the page is told to pause once the queue is full and to resume
+ * arrived over the direct connection. The page is told to pause once the
+ * queue is full and to resume
  * when the browser has drained it to disk. Without that, a fast sender on
  * a LAN outruns a slow disk and the queue grows until the worker dies.
  */
@@ -177,12 +200,10 @@ function portStream(port) {
     }
     if (message.done) {
       controller.close();
-      port.close();
       return;
     }
     if (message.error) {
       controller.error(new Error(String(message.error)));
-      port.close();
     }
   };
 
@@ -210,7 +231,7 @@ function decryptingStream(key) {
         if (buffer.length < 4) break;
         const frameLength = readUint32BE(buffer, 0);
         if (frameLength === 0) {
-          controller.error(new Error("relay sent a zero-length frame"));
+          controller.error(new Error("peer sent a zero-length frame"));
           return;
         }
         if (frameLength > STREAM_MAX_FRAME_BYTES) {
@@ -235,7 +256,9 @@ function decryptingStream(key) {
           // Authentication is per chunk, so tampering is caught here —
           // mid-transfer, before a single decrypted byte reaches disk.
           controller.error(
-            new Error(`chunk ${counter} failed authentication; transfer aborted`),
+            new Error(
+              `chunk ${counter} failed authentication; transfer aborted`,
+            ),
           );
           return;
         }
@@ -301,10 +324,10 @@ function contentDisposition(filename) {
       .replace(/[\r\n"\\]/g, "")
       .replace(/[/\\]/g, "_")
       // eslint-disable-next-line no-control-regex
-      .replace(/[\u0000-\u001f\u007f]/g, "")
+      .replace(/[^\x20-\x7e]/g, "_")
       .trim()
       .slice(0, 200) || "download";
-  return `attachment; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+  return `attachment; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(filename.toWellFormed()).replace(/['()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)}`;
 }
 
 /** Drops prepared downloads that were never started. */

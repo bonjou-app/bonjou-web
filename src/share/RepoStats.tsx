@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { GitFork, Github, Star, Tag } from "lucide-react";
+import { GitFork } from "@phosphor-icons/react/dist/csr/GitFork";
+import { GithubLogo as Github } from "@phosphor-icons/react/dist/csr/GithubLogo";
+import { Star } from "@phosphor-icons/react/dist/csr/Star";
+import { Tag } from "@phosphor-icons/react/dist/csr/Tag";
+
+import { Button } from "@/components/ui/button";
 
 /**
  * Live repository figures, fetched from the public GitHub API.
@@ -54,15 +59,20 @@ export function RepoStats({ compact = false }: { compact?: boolean }) {
           fetch(`https://api.github.com/repos/${REPO}`).then((r) =>
             r.ok ? r.json() : null,
           ),
-          fetch(`https://api.github.com/repos/${REPO}/releases/latest`).then((r) =>
-            r.ok ? r.json() : null,
+          fetch(`https://api.github.com/repos/${REPO}/releases/latest`).then(
+            (r) => (r.ok ? r.json() : null),
           ),
         ]);
         if (cancelled) return;
         const next: Stats = {
-          stars: typeof repo?.stargazers_count === "number" ? repo.stargazers_count : null,
-          forks: typeof repo?.forks_count === "number" ? repo.forks_count : null,
-          release: typeof release?.tag_name === "string" ? release.tag_name : null,
+          stars:
+            typeof repo?.stargazers_count === "number"
+              ? repo.stargazers_count
+              : null,
+          forks:
+            typeof repo?.forks_count === "number" ? repo.forks_count : null,
+          release:
+            typeof release?.tag_name === "string" ? release.tag_name : null,
           fetchedAt: Date.now(),
         };
         setStats(next);
@@ -84,19 +94,26 @@ export function RepoStats({ compact = false }: { compact?: boolean }) {
   if (compact) {
     if (typeof stats?.stars !== "number") return null;
     return (
-      <a
-        className="repo-pill"
-        href={`https://github.com/${REPO}`}
-        aria-label={`${stats.stars} stars on GitHub`}
+      <Button
+        asChild
+        variant="outline"
+        className="repo-pill h-10 px-3 max-[1250px]:hidden"
       >
-        <Github size={14} strokeWidth={1.75} aria-hidden="true" />
-        <span>{compactCount(stats.stars)}</span>
-      </a>
+        <a
+          href={`https://github.com/${REPO}`}
+          aria-label={`${stats.stars} stars on GitHub`}
+        >
+          <Github size={18} className="size-[1.125rem]" aria-hidden="true" />
+          <span>{compactCount(stats.stars)}</span>
+        </a>
+      </Button>
     );
   }
 
   const items = [
-    stats?.release ? { icon: Tag, label: "Latest", value: stats.release } : null,
+    stats?.release
+      ? { icon: Tag, label: "Latest", value: stats.release }
+      : null,
     typeof stats?.stars === "number"
       ? { icon: Star, label: "Stars", value: stats.stars.toLocaleString() }
       : null,
@@ -108,19 +125,17 @@ export function RepoStats({ compact = false }: { compact?: boolean }) {
   if (items.length === 0) return null;
 
   return (
-    <a
-      className="repo-stats"
-      href={`https://github.com/${REPO}`}
-      aria-label="Repository on GitHub"
-    >
-      {items.map(({ icon: Icon, label, value }) => (
-        <span className="repo-stat" key={label}>
-          <Icon size={14} strokeWidth={1.75} aria-hidden="true" />
-          <span className="repo-stat-value">{value}</span>
-          <span className="repo-stat-label">{label}</span>
-        </span>
-      ))}
-    </a>
+    <Button asChild variant="ghost" className="repo-stats">
+      <a href={`https://github.com/${REPO}`} aria-label="Repository on GitHub">
+        {items.map(({ icon: Icon, label, value }) => (
+          <span className="repo-stat" key={label}>
+            <Icon size={18} className="size-[1.125rem]" aria-hidden="true" />
+            <span className="repo-stat-value">{value}</span>
+            <span className="repo-stat-label">{label}</span>
+          </span>
+        ))}
+      </a>
+    </Button>
   );
 }
 

@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Drawer } from "vaul";
 
+import { Button } from "@/components/ui/button";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerFooter,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { Input } from "@/components/ui/input";
 import { Composer } from "./Composer";
 import { FileIcon } from "./FileIcon";
 import { NameGate } from "./NameGate";
@@ -17,7 +26,7 @@ import {
 import { formatBytes } from "./transfer";
 import { notifyOffer, useSettings } from "./settings";
 import { useVerified } from "./verified";
-import type { Peer } from "./relay";
+import type { Peer } from "./coordinator";
 import { useMediaQuery, type ThemeChoice, type ResolvedTheme } from "./theme";
 import { EVERYONE, type IncomingItem, type useSession } from "./useSession";
 
@@ -29,12 +38,22 @@ interface WorkspaceProps {
   theme: ResolvedTheme;
   onThemeChoice: (choice: ThemeChoice) => void;
   onToggleTheme: () => void;
+  visible?: boolean;
 }
 
 export function Workspace(props: WorkspaceProps) {
-  const { name, onName, session, themeChoice, theme, onThemeChoice, onToggleTheme } =
-    props;
+  const {
+    name,
+    onName,
+    session,
+    themeChoice,
+    theme,
+    onThemeChoice,
+    onToggleTheme,
+    visible = true,
+  } = props;
 
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [activeId, setActiveId] = useState<string>(EVERYONE);
   const [mobileView, setMobileView] = useState<"list" | "thread">("list");
   const [palette, setPalette] = useState(false);
@@ -42,6 +61,18 @@ export function Workspace(props: WorkspaceProps) {
   const [transfersOpen, setTransfersOpen] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [roomOpen, setRoomOpen] = useState(false);
+  useEffect(() => {
+    if (session.roomError || session.roomPending) setRoomOpen(true);
+  }, [session.roomError, session.roomPending]);
+  useEffect(() => {
+    if (!visible) {
+      setRoomOpen(false);
+      setSettingsOpen(false);
+      setTransfersOpen(false);
+      setVerifyOpen(false);
+      setPalette(false);
+    }
+  }, [visible]);
 
   const { settings, set: setSetting, enableNotifications } = useSettings();
   const { confirm, isVerified } = useVerified();
@@ -86,13 +117,24 @@ export function Workspace(props: WorkspaceProps) {
   // nobody to send to.
   useEffect(() => {
     if (activeId === EVERYONE || activeId === "received") return;
-    if (!session.peers.some((peer) => peer.id === activeId)) setActiveId(EVERYONE);
+    if (!session.peers.some((peer) => peer.id === activeId))
+      setActiveId(EVERYONE);
   }, [session.peers, activeId]);
 
   const { markRead } = session;
   useEffect(() => {
-    markRead(activeId);
-  }, [activeId, session.events.length, markRead]);
+    const read = () => {
+      if (
+        visible &&
+        document.visibilityState === "visible" &&
+        (!narrow || mobileView === "thread")
+      )
+        markRead(activeId);
+    };
+    read();
+    document.addEventListener("visibilitychange", read);
+    return () => document.removeEventListener("visibilitychange", read);
+  }, [activeId, session.events.length, markRead, narrow, mobileView, visible]);
 
   // A file offered while the tab is in the background is the one event
   // worth interrupting somebody for, and the only one wired to a system
@@ -102,23 +144,18 @@ export function Workspace(props: WorkspaceProps) {
     for (const event of session.events) {
       if (event.kind !== "incoming") continue;
       const item = event.item;
-      if (item.state !== "pending" || announced.current.has(item.requestId)) continue;
+      if (item.state !== "pending" || announced.current.has(item.requestId))
+        continue;
       announced.current.add(item.requestId);
       notifyOffer(labels[item.from] ?? item.fromName, item.name);
     }
   }, [session.events, settings.notifyOffers, labels]);
 
-  // Everyone on one Wi-Fi is already in a shared room, so a code room used
-  // to add people rather than narrow to them: a broadcast reached the
-  // neighbour who never entered the code. Once there is a room, a
-  // broadcast means the room. Neighbours stay listed and individually
-  // reachable, they just stop receiving what was addressed to the room.
-  const roomPeers = useMemo(
-    () => session.peers.filter((peer) => peer.source === "code"),
-    [session.peers],
-  );
+  // Joining a room leaves the open network lobby. The coordinator therefore
+  // gives this session only room candidates, making "Everyone" an exact room
+  // broadcast rather than a client-side filtering convention.
   const inRoom = Boolean(session.code);
-  const broadcast = inRoom ? roomPeers : session.peers;
+  const broadcast = session.peers;
 
   const targets = useMemo(() => {
     if (activeId === "received") return [];
@@ -148,7 +185,6 @@ export function Workspace(props: WorkspaceProps) {
 
   const subtitle = threadSubtitle(
     activeId,
-    session.peers,
     broadcast,
     inRoom,
     session.received.length,
@@ -187,14 +223,12 @@ export function Workspace(props: WorkspaceProps) {
   }, [session.events]);
 
   const copyLink = useCallback(() => {
-    void navigator.clipboard.writeText(
-      `${window.location.origin}/r/${session.code}`,
-    );
     session.setNotice("Room link copied.");
   }, [session]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (!visible) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setPalette((open) => !open);
@@ -202,22 +236,22 @@ export function Workspace(props: WorkspaceProps) {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  }, [visible]);
 
-  if (!name) return <NameGate onName={onName} />;
+  if (!name) return visible ? <NameGate onName={onName} /> : null;
 
   const canVerify = Boolean(activePeer);
   const classes = [
     "workspace",
     `is-${mobileView}`,
     settings.compact ? "is-compact" : "",
-    settings.routeTags ? "" : "no-route-tags",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <div className={classes}>
+    <main className={classes} hidden={!visible}>
+      <h1 className="bj-sr">Bonjou workspace</h1>
       <Rail
         name={name}
         status={session.status}
@@ -251,10 +285,22 @@ export function Workspace(props: WorkspaceProps) {
           onVerify={() => setVerifyOpen(true)}
           onHistory={() => setTransfersOpen(true)}
           onBack={() => setMobileView("list")}
+          peerCount={session.peers.length}
+          candidateCount={session.candidateCount}
+          status={session.status}
+          code={session.code}
+          onRoom={() => setRoomOpen(true)}
+          onRetry={session.retryConnection}
+          verified={Boolean(activePeer && isVerified(activePeer.pubkey))}
         />
 
-        {activeId === "received" ? null : (
+        {activeId === "received" || targets.length === 0 ? null : (
           <Composer
+            key={activeId}
+            draft={drafts[activeId] ?? ""}
+            onDraft={(value) =>
+              setDrafts((current) => ({ ...current, [activeId]: value }))
+            }
             targets={targets}
             destination={destination}
             onSendText={session.sendText}
@@ -264,22 +310,28 @@ export function Workspace(props: WorkspaceProps) {
       </div>
 
       {/* Driven from the palette, which has no file control of its own. */}
-      <input
+      <Input
         ref={fileInput}
         type="file"
         multiple
+        tabIndex={-1}
+        disabled={targets.length === 0}
         className="bj-sr"
+        aria-label="Choose files to send"
         onChange={(event) => {
           const files = [...(event.target.files ?? [])];
           if (files.length) session.sendFiles(targets, files);
           event.target.value = "";
         }}
       />
-      <input
+      <Input
         ref={folderInput}
         type="file"
         multiple
+        tabIndex={-1}
+        disabled={targets.length === 0}
         className="bj-sr"
+        aria-label="Choose a folder to send"
         {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
         onChange={(event) => {
           const files = [...(event.target.files ?? [])];
@@ -294,6 +346,7 @@ export function Workspace(props: WorkspaceProps) {
         peers={session.peers}
         labels={labels}
         canVerify={canVerify}
+        canSend={targets.length > 0}
         onSelectThread={selectThread}
         onPickFiles={() => fileInput.current?.click()}
         onPickFolder={() => folderInput.current?.click()}
@@ -308,7 +361,9 @@ export function Workspace(props: WorkspaceProps) {
         open={verifyOpen}
         onOpenChange={setVerifyOpen}
         peerName={activePeer ? (labels[activePeer.id] ?? activePeer.name) : ""}
-        fingerprint={activePeer ? (session.fingerprints[activePeer.id] ?? "") : ""}
+        fingerprint={
+          activePeer ? (session.fingerprints[activePeer.id] ?? "") : ""
+        }
         verified={Boolean(activePeer && isVerified(activePeer.pubkey))}
         onConfirm={() => activePeer && confirm(activePeer.pubkey)}
       />
@@ -318,10 +373,14 @@ export function Workspace(props: WorkspaceProps) {
         onOpenChange={setRoomOpen}
         code={session.code}
         onCreate={session.createRoom}
-        onJoin={(value) => {
-          session.joinRoom(value);
+        onJoin={session.joinRoom}
+        onLeave={() => {
+          session.leaveRoom();
           setRoomOpen(false);
+          setActiveId(EVERYONE);
         }}
+        pending={session.roomPending}
+        error={session.roomError}
       />
 
       <SettingsPanel
@@ -344,16 +403,14 @@ export function Workspace(props: WorkspaceProps) {
         entries={history}
       />
 
-      {pendingOffer && narrow ? (
-        <Drawer.Root open shouldScaleBackground={false} dismissible={false}>
-          <Drawer.Portal>
-            <Drawer.Overlay className="sheet-scrim" />
-            <Drawer.Content className="sheet">
-              <Drawer.Handle className="sheet-grip" />
-              <Drawer.Title className="bj-label is-accent">
+      {pendingOffer && narrow && visible ? (
+        <Drawer open shouldScaleBackground={false} dismissible={false}>
+          <DrawerContent className="sheet pb-[env(safe-area-inset-bottom)]">
+            <DrawerHeader className="text-left">
+              <DrawerTitle className="text-lg">
                 {labels[pendingOffer.from] ?? pendingOffer.fromName} is offering
-              </Drawer.Title>
-              <p className="sheet-name">
+              </DrawerTitle>
+              <p className="sheet-name mt-2 text-lg font-semibold">
                 <FileIcon
                   name={pendingOffer.name}
                   folder={Boolean(pendingOffer.note)}
@@ -361,41 +418,41 @@ export function Workspace(props: WorkspaceProps) {
                 />
                 {pendingOffer.name}
               </p>
-              <Drawer.Description className="sheet-meta">
+              <DrawerDescription className="sheet-meta">
                 {formatBytes(pendingOffer.size)}
                 {pendingOffer.note ? ` · ${pendingOffer.note}` : ""}
-              </Drawer.Description>
-              <p className="sheet-note">
-                Nothing has downloaded yet. The bytes are still on their machine,
-                and approving is what starts the transfer.
-              </p>
-              <div className="sheet-actions">
-                <button
-                  type="button"
-                  className="btn-accent is-large"
-                  onClick={() => session.approve(pendingOffer)}
-                >
-                  Approve and download
-                </button>
-                <button
-                  type="button"
-                  className="btn-quiet is-large"
-                  onClick={() => session.decline(pendingOffer)}
-                >
-                  Decline
-                </button>
-              </div>
-            </Drawer.Content>
-          </Drawer.Portal>
-        </Drawer.Root>
+              </DrawerDescription>
+            </DrawerHeader>
+            <p className="px-4 text-sm leading-relaxed text-muted-foreground">
+              Nothing has downloaded yet. The bytes are still on their machine,
+              and approving is what starts the transfer.
+            </p>
+            <DrawerFooter>
+              <Button
+                type="button"
+                className="h-12 px-6 text-[0.9375rem]"
+                onClick={() => session.approve(pendingOffer)}
+              >
+                Approve and download
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-12 px-6 text-[0.9375rem]"
+                onClick={() => session.decline(pendingOffer)}
+              >
+                Decline
+              </Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
       ) : null}
-    </div>
+    </main>
   );
 }
 
 function threadSubtitle(
   activeId: string,
-  peers: Peer[],
   broadcast: Peer[],
   inRoom: boolean,
   receivedCount: number,
@@ -409,21 +466,19 @@ function threadSubtitle(
   }
   if (activeId === EVERYONE) {
     if (broadcast.length === 0) {
-      return inRoom ? "Nobody has joined yet, share the code" : "Nobody reachable yet";
+      return inRoom
+        ? "Nobody has joined yet, share the code"
+        : "Nobody reachable yet";
     }
-    // Naming the people left out is the whole point: without it, someone
-    // visible in the list but not receiving the broadcast looks like a bug.
-    const outside = inRoom ? peers.length - broadcast.length : 0;
     return [
       broadcast.length === 1 ? "1 person" : `${broadcast.length} people`,
       pendingCount > 0 ? `${pendingCount} waiting for you` : "",
-      outside > 0 ? `${outside} more on your Wi-Fi, message them one to one` : "",
     ]
       .filter(Boolean)
       .join(" · ");
   }
   if (!activePeer) return "No longer reachable";
   return activePeer.source === "network"
-    ? "On your Wi-Fi · direct when the connection allows it"
+    ? "On your Wi-Fi · connected directly"
     : "Joined by room code";
 }

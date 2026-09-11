@@ -1,30 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardFooter, CardHeader } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { FileIcon } from "./FileIcon";
 import { cipherSizeFor, formatBytes } from "./transfer";
-import type {
-  ChatLine,
-  IncomingItem,
-  OutgoingItem,
-  TransferPath,
-} from "./useSession";
+import type { ChatLine, IncomingItem, OutgoingItem } from "./useSession";
 
 function clock(at: number): string {
   return new Date(at).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-/**
- * Which route the bytes took. A direct transfer runs at LAN speed and a
- * relayed one at the speed of a round trip to the relay, and that is
- * usually the entire explanation for why one send crawled, so it is shown
- * rather than left to be guessed at.
- */
-function PathTag({ path }: { path?: TransferPath }) {
-  if (!path) return null;
-  return <span className={`path-tag is-${path}`}>{path}</span>;
 }
 
 /**
@@ -72,7 +59,10 @@ function useRate(bytes: number, active: boolean): { rate: number } | null {
     }
     const now = Date.now();
     samples.current.push({ at: now, bytes });
-    while (samples.current.length > 2 && now - samples.current[0].at > RATE_WINDOW_MS) {
+    while (
+      samples.current.length > 2 &&
+      now - samples.current[0].at > RATE_WINDOW_MS
+    ) {
       samples.current.shift();
     }
   }, [bytes, active]);
@@ -133,7 +123,7 @@ export function MessageRow({ line, label }: { line: ChatLine; label: string }) {
         <span className="row-who">{line.outbound ? "You" : label}</span>
         <time dateTime={new Date(line.at).toISOString()}>{clock(line.at)}</time>
       </div>
-      <p className="bubble">{line.text}</p>
+      <div className="bubble">{line.text}</div>
     </li>
   );
 }
@@ -150,22 +140,30 @@ export function IncomingRow({
   onDecline: (item: IncomingItem) => void;
 }) {
   const pending = item.state === "pending";
-  const running = item.state === "receiving" || item.state === "approved";
+  const running =
+    item.state === "receiving" ||
+    item.state === "approved" ||
+    item.state === "verifying";
 
-  // Only the direct path reports bytes. A relayed download is streamed to
-  // disk inside the service worker, so the honest bar there is an
-  // indeterminate one rather than a percentage nobody measured.
   const tracked = typeof item.receivedBytes === "number";
   const fraction =
     item.state === "done"
       ? 1
       : tracked
-        ? Math.min(1, item.receivedBytes! / Math.max(1, cipherSizeFor(item.size)))
+        ? Math.min(
+            1,
+            item.receivedBytes! / Math.max(1, cipherSizeFor(item.size)),
+          )
         : 0;
   const plainReceived = fraction * item.size;
   const measured = useRate(plainReceived, running && tracked);
 
-  const head = running && tracked ? `Downloading ${Math.round(fraction * 100)}%` : incomingLabel(item);
+  const head =
+    running && tracked
+      ? item.state === "verifying"
+        ? "Checking file…"
+        : `Downloading ${Math.round(fraction * 100)}%`
+      : incomingLabel(item);
 
   return (
     <li className="row">
@@ -174,8 +172,8 @@ export function IncomingRow({
         <time dateTime={new Date(item.at).toISOString()}>{clock(item.at)}</time>
       </div>
 
-      <div className={`card is-${item.state}${pending ? " is-asking" : ""}`}>
-        <div className="card-head">
+      <Card className={`card is-${item.state}${pending ? " is-asking" : ""}`}>
+        <CardHeader className="card-head flex items-center gap-3">
           <PayloadIcon
             name={item.name}
             folder={Boolean(item.note)}
@@ -183,53 +181,59 @@ export function IncomingRow({
           />
           <span className="card-name">{item.name}</span>
           <span className="card-size">{formatBytes(item.size)}</span>
-        </div>
+        </CardHeader>
 
-        <div
+        <Progress
           className={running && !tracked ? "meter is-sweeping" : "meter"}
-          role="progressbar"
+          value={running && !tracked ? undefined : fraction * 100}
           aria-label={`${item.name} transfer`}
-          {...(running && !tracked
-            ? {}
-            : {
-                "aria-valuenow": Math.round(fraction * 100),
-                "aria-valuemin": 0,
-                "aria-valuemax": 100,
-              })}
-        >
-          <span className="meter-fill" style={{ transform: `scaleX(${fraction})` }} />
-        </div>
+        />
 
         {pending ? (
-          <div className="card-foot">
+          <CardFooter className="card-foot justify-between gap-3">
             <span className="card-state">
               {item.note ? `${item.note} · ` : ""}Nothing has downloaded yet
             </span>
             <span className="card-actions">
-              <button type="button" className="btn-quiet" onClick={() => onDecline(item)}>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 px-4"
+                onClick={() => onDecline(item)}
+              >
                 Decline
-              </button>
-              <button type="button" className="btn-accent" onClick={() => onApprove(item)}>
+              </Button>
+              <Button
+                type="button"
+                className="h-11 px-4"
+                onClick={() => onApprove(item)}
+              >
                 Approve
-              </button>
+              </Button>
             </span>
-          </div>
+          </CardFooter>
         ) : item.state === "failed" ? (
-          <div className="card-foot is-stacked">
+          <CardFooter className="card-foot block">
             <p className="card-error">{item.error ?? "Transfer failed"}</p>
             <p className="card-note">
-              Nothing was written to your disk. Ask them to send it again.
+              The transfer did not finish. Remove any incomplete download and
+              ask the sender to try again.
             </p>
-          </div>
+          </CardFooter>
         ) : (
-          <div className="card-foot">
+          <CardFooter className="card-foot justify-between gap-3">
             <span className="card-state">
-              {liveDetail(head, plainReceived, item.size, running && tracked, measured)}
+              {liveDetail(
+                head,
+                plainReceived,
+                item.size,
+                running && tracked,
+                measured,
+              )}
             </span>
-            <PathTag path={item.path} />
-          </div>
+          </CardFooter>
         )}
-      </div>
+      </Card>
     </li>
   );
 }
@@ -248,12 +252,19 @@ export function OutgoingRow({
 }) {
   const first = items[0];
   const done = items.filter((i) => i.state === "done").length;
-  const failed = items.filter((i) => i.state === "failed" || i.state === "declined");
+  const failed = items.filter(
+    (i) => i.state === "failed" || i.state === "declined",
+  );
   const sending = items.filter((i) => i.state === "sending");
 
   const totalBytes = items.reduce((sum, i) => sum + i.size, 0);
   const sentBytes = items.reduce((sum, i) => sum + i.sentBytes, 0);
-  const fraction = totalBytes > 0 ? sentBytes / totalBytes : 0;
+  const fraction =
+    done === items.length
+      ? 1
+      : totalBytes > 0
+        ? Math.min(1, sentBytes / totalBytes)
+        : 0;
   const state = summaryState(items);
   const measured = useRate(sentBytes, sending.length > 0);
 
@@ -266,25 +277,25 @@ export function OutgoingRow({
     <li className="row is-mine">
       <div className="row-meta">
         <span className="row-who">To {to}</span>
-        <time dateTime={new Date(first.at).toISOString()}>{clock(first.at)}</time>
+        <time dateTime={new Date(first.at).toISOString()}>
+          {clock(first.at)}
+        </time>
       </div>
 
-      <div className={`card is-${state}`}>
-        <div className="card-head">
+      <Card className={`card is-${state}`}>
+        <CardHeader className="card-head flex items-center gap-3">
           <PayloadIcon
             name={first.label}
-            folder={false}
+            folder={Boolean(first.folder)}
             moving={sending.length > 0}
           />
           <span className="card-name">{first.label}</span>
           <span className="card-size">{formatBytes(first.size)}</span>
-        </div>
+        </CardHeader>
 
-        <div className="meter" aria-hidden="true">
-          <span className="meter-fill" style={{ transform: `scaleX(${fraction})` }} />
-        </div>
+        <Progress className="meter" value={fraction * 100} aria-hidden="true" />
 
-        <div className="card-foot">
+        <CardFooter className="card-foot justify-between gap-3">
           <span className="card-state">
             {liveDetail(
               outgoingLabel(items, done, sending.length, fraction),
@@ -294,27 +305,14 @@ export function OutgoingRow({
               measured,
             )}
           </span>
-          <PathTag path={sharedPath(items)} />
-        </div>
+        </CardFooter>
 
         {failed.length > 0 && failed[0].error ? (
           <p className="card-error is-foot">{failed[0].error}</p>
         ) : null}
-      </div>
+      </Card>
     </li>
   );
-}
-
-/**
- * The route for a collapsed fan-out row, or nothing when the recipients
- * did not all take the same one. Claiming "direct" for a group where one
- * person fell back to the relay would be a small lie about a number people
- * are reading to explain a speed.
- */
-function sharedPath(items: OutgoingItem[]): TransferPath | undefined {
-  const paths = new Set(items.map((item) => item.path));
-  if (paths.size !== 1) return undefined;
-  return items[0].path;
 }
 
 function summaryState(items: OutgoingItem[]): string {
@@ -369,7 +367,9 @@ function outgoingLabel(
   if (failed > 0) parts.push(`${failed} failed`);
 
   const summary = parts.join(", ");
-  return summary ? summary.charAt(0).toUpperCase() + summary.slice(1) : "Waiting for approval";
+  return summary
+    ? summary.charAt(0).toUpperCase() + summary.slice(1)
+    : "Waiting for approval";
 }
 
 function incomingLabel(item: IncomingItem): string {
@@ -378,8 +378,10 @@ function incomingLabel(item: IncomingItem): string {
       return "Starting";
     case "receiving":
       return "Downloading";
+    case "verifying":
+      return "Checking file…";
     case "done":
-      return "Saved to your downloads";
+      return "Transfer complete. Check your downloads.";
     case "declined":
       return "Declined, nothing was sent";
     case "failed":
