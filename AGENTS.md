@@ -3,6 +3,14 @@
 This is the canonical guidance for agents in this repository. `CLAUDE.md`
 imports it. Apply relevant skills and engineering practices by default.
 
+## Communication Guidelines
+
+- Be direct and honest; do not agree just to be agreeable.
+- Challenge the user's assumptions when they are weak.
+- If the user is wrong, say so clearly and explain why.
+- Rate ideas honestly out of 10.
+- If you are uncertain, say so instead of guessing confidently.
+
 ## Default Working Practices
 
 - Treat relevant skills, sound engineering practices, security, and verification as defaults. The user should not need to repeat "use the best skills and guidelines" in each task.
@@ -21,7 +29,7 @@ imports it. Apply relevant skills and engineering practices by default.
 - One React application serves `/`, `/app`, `/r/{code}`, and the `/share` compatibility route. Preserve the shared session and one active session per browser.
 - Read `PRODUCT.md` and `DESIGN.md` for product language, tokens, themes, and accessibility. Keep design tokens in `src/share/tokens.css`; use existing components before adding dependencies.
 - Preserve the approved Bonjou logo in `src/share/brandMark.json`. Regenerate exports with `npm run generate:brand` and follow the logo section in `DESIGN.md` when updating copies in the CLI and organization profile repositories.
-- The relay is an opaque forwarding service. Never move client encryption keys, decryption, or user payload storage to the relay.
+- The coordinator is signaling-only: it groups source-network candidates and forwards opaque encrypted WebRTC signaling. It must never receive profiles, chats, file metadata, or file payloads. Keep application data on direct WebRTC.
 
 ## Commands and verification
 
@@ -29,7 +37,7 @@ imports it. Apply relevant skills and engineering practices by default.
 - `npm run dev` runs Vite on loopback.
 - `npm run check:protocol` checks the recorded fixture checksum and the exact pinned Go revision over HTTPS. For local/offline work, append `-- /path/to/bonjou-cli`.
 - `npm test` runs the browser tests; `npm run build` checks TypeScript and creates `dist/`.
-- `npm run smoke` checks a relay running at `http://127.0.0.1:46330`; set `RELAY` to use another relay you operate. Start the relay from the CLI repository.
+- `npm run smoke` checks a coordinator running at `http://127.0.0.1:46330`; set `COORDINATOR` to use another coordinator you operate. Start the coordinator from the CLI repository.
 - For UI changes, verify affected routes and flows in a browser, including keyboard use, mobile layout, and both themes. Report any verification gaps.
 
 ## Protocol and security

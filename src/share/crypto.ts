@@ -207,9 +207,9 @@ export const ENVELOPE_KINDS = {
   fileReject: "file_reject",
   file: "file",
   ack: "ack",
-  // Browser-only. Signalling for a direct connection rides the sealed
-  // envelope, so the relay forwards offers and candidates it cannot read
-  // and needs no knowledge of WebRTC at all. The Go CLI ignores these:
+  // Browser-only. Signaling for a direct connection rides the sealed
+  // envelope, so the coordinator forwards offers and candidates it cannot
+  // read and needs no knowledge of WebRTC. The Go CLI ignores these:
   // it discovers peers by UDP broadcast and already talks to them
   // directly, so it has nothing to negotiate.
   rtcOffer: "rtc_offer",
@@ -394,8 +394,8 @@ export class ChunkedFrameReader {
 
 /**
  * A short fingerprint over both session public keys, for out-of-band
- * comparison. The relay hands each side the other's key, so a malicious
- * relay could substitute its own; reading eight bytes aloud is what
+ * comparison. The coordinator hands each side the other's key, so a
+ * malicious coordinator could substitute its own; reading eight bytes aloud is what
  * closes that gap until a PAKE replaces it. Format matches the CLI's
  * @fingerprint output.
  */

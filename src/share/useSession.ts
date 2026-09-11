@@ -1,11 +1,4 @@
-/**
- * All session state for the transfer instrument: who is reachable, what
- * has been offered, what is moving.
- *
- * Kept apart from the components because the relay's event handlers must
- * not be rebuilt every render, and because the rules about consent live
- * here: an incoming offer is metadata until its user approves it.
- */
+/** Session state for local discovery, direct chat, and direct file transfer. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -20,7 +13,13 @@ import {
   type Envelope,
   type KeyPair,
 } from "./crypto";
-import { RelayClient, describe, type ConnectionStatus, type Peer } from "./relay";
+import {
+  CoordinatorClient,
+  describe,
+  type Candidate,
+  type ConnectionStatus,
+  type Peer,
+} from "./coordinator";
 import { useSiblingTabs } from "./tabs";
 import {
   cipherSizeFor,
@@ -28,8 +27,6 @@ import {
   sendOverChannel,
   serviceWorkerSupported,
   startDirectDownload,
-  startDownload,
-  uploadStream,
   type DownloadSink,
 } from "./transfer";
 import {
@@ -40,32 +37,27 @@ import {
 } from "./webrtc";
 import { entriesFor, folderNameFor, zipSize, zipStream } from "./zip";
 
-export const RELAY_BASE = (
-  import.meta.env.VITE_RELAY_URL ?? "https://bonjou.80-225-228-65.sslip.io"
+export const COORDINATOR_BASE = (
+  import.meta.env.VITE_COORDINATOR_URL ??
+  import.meta.env.VITE_RELAY_URL ??
+  "https://bonjou.80-225-228-65.sslip.io"
 ).replace(/\/$/, "");
 
-const RELAY_WS = `${RELAY_BASE.replace(/^http/, "ws")}/ws`;
+const COORDINATOR_WS = `${COORDINATOR_BASE.replace(/^http/, "ws")}/ws`;
+const CONTROL_TIMEOUT_MS = 15_000;
+const COMPLETE_TIMEOUT_MS = 60_000;
+const MAX_CONCURRENT_PAYLOADS = 4;
+const MAX_TEXT_LENGTH = 16 * 1024;
+const REQUEST_ID = /^[0-9a-f]{16}$/;
+const STREAM_ID = /^[0-9a-f]{32}$/;
 
-/**
- * How long to wait for a direct connection before giving up and using the
- * relay. Negotiation starts when the file is offered, so by the time
- * somebody has approved it this has usually already resolved; the wait
- * only matters when approval is instant.
- */
-const DIRECT_WAIT_MS = 5000;
-
-/**
- * Which route a transfer took. Worth surfacing: it is the difference
- * between a LAN and a round trip to Mumbai, and otherwise people are left
- * guessing why one send was fast and another was not.
- */
-export type TransferPath = "direct" | "relayed";
-
-export type OutgoingState = "offered" | "sending" | "done" | "failed" | "declined";
+export type OutgoingState =
+  "offered" | "sending" | "done" | "failed" | "declined";
 export type IncomingState =
   | "pending"
   | "approved"
   | "receiving"
+  | "verifying"
   | "done"
   | "failed"
   | "declined";
@@ -74,13 +66,7 @@ export interface OutgoingItem {
   requestId: string;
   peerId: string;
   peerName: string;
-  /** Plaintext bytes this send will produce. */
   size: number;
-  /**
-   * Opens the plaintext afresh. A function rather than a stream because
-   * each recipient needs its own: a folder is zipped per transfer, and a
-   * stream cannot be read twice.
-   */
   openStream: () => ReadableStream<Uint8Array>;
   label: string;
   streamId: Uint8Array;
@@ -88,15 +74,8 @@ export interface OutgoingItem {
   sentBytes: number;
   error?: string;
   at: number;
-  /** Set once the route is chosen, at the moment sending starts. */
-  path?: TransferPath;
-  /**
-   * Sending one file to several people fans out into one transfer each,
-   * because a shared secret is per pair. groupId ties those back together
-   * so the Everyone view can show a single row instead of one per
-   * recipient.
-   */
   groupId: string;
+  folder?: boolean;
 }
 
 export interface IncomingItem {
@@ -109,26 +88,12 @@ export interface IncomingItem {
   state: IncomingState;
   error?: string;
   at: number;
-  /** Extra human detail from the sender, such as a folder's file count. */
   note?: string;
-  /** Set once the route is known, at the moment bytes start arriving. */
-  path?: TransferPath;
-  /**
-   * Sealed bytes arrived so far, against `cipherSizeFor(size)`. Counted in
-   * ciphertext because that is what this side can actually observe, and
-   * the ratio is exact either way.
-   *
-   * Only the direct path can fill this in: a relayed download is streamed
-   * to disk inside the service worker, which the page never sees. Left
-   * undefined there rather than estimated, so the progress bar can be
-   * honestly indeterminate instead of inventing a number.
-   */
   receivedBytes?: number;
 }
 
 export interface ChatLine {
   id: string;
-  /** Inbound: the sender. Outbound: everyone it was addressed to. */
   peerIds: string[];
   from: string;
   text: string;
@@ -136,14 +101,14 @@ export interface ChatLine {
   outbound: boolean;
 }
 
-/**
- * One entry in a conversation. Messages and transfers share a shape so a
- * thread can sort them into a single true timeline; the previous model
- * kept three parallel lists with no timestamps on two of them, which made
- * correct ordering impossible rather than merely absent.
- */
 export type ThreadEvent =
-  | { kind: "message"; id: string; at: number; peerIds: string[]; line: ChatLine }
+  | {
+      kind: "message";
+      id: string;
+      at: number;
+      peerIds: string[];
+      line: ChatLine;
+    }
   | {
       kind: "incoming";
       id: string;
@@ -185,20 +150,14 @@ function withTimeout<T>(
   });
 }
 
-/**
- * Progress arrives once per 64 KiB frame, which on a direct connection is
- * several hundred React renders a second for a number nobody can read that
- * fast. Coalesce to roughly ten a second, leading and trailing, so the
- * last value always lands and a finished transfer never rests a frame
- * short of complete.
- */
 const PROGRESS_INTERVAL_MS = 100;
 
-function throttleProgress(emit: (bytes: number) => void): (bytes: number) => void {
+function throttleProgress(
+  emit: (bytes: number) => void,
+): (bytes: number) => void {
   let lastAt = 0;
   let latest = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
-
   return (bytes: number) => {
     latest = bytes;
     const now = Date.now();
@@ -219,28 +178,74 @@ function throttleProgress(emit: (bytes: number) => void): (bytes: number) => voi
 
 function roomCodeFromLocation(): string {
   const fromPath = /^\/r\/([^/]+)/.exec(window.location.pathname);
-  if (fromPath) return decodeURIComponent(fromPath[1]);
+  if (fromPath) {
+    try {
+      return decodeURIComponent(fromPath[1]);
+    } catch {
+      return fromPath[1];
+    }
+  }
   return new URLSearchParams(window.location.search).get("r") ?? "";
 }
 
+export function sanitizePeerName(raw: string): string {
+  const clean = [...raw.trim()]
+    .filter((char) => {
+      const code = char.codePointAt(0) ?? 0;
+      return code >= 0x20 && code !== 0x7f;
+    })
+    .join("")
+    .trim();
+  return [...clean].slice(0, 64).join("") || "Nearby user";
+}
+
+function sanitizeFilename(raw: string): string {
+  const clean = sanitizePeerName(raw).replace(/[/\\]/g, "_");
+  return clean === "Nearby user" ? "download" : clean.slice(0, 200);
+}
+
+function envelopeFor(
+  kind: string,
+  from: string,
+  fields: Partial<Envelope>,
+): Envelope {
+  return {
+    kind,
+    from,
+    from_ip: "",
+    to: "",
+    name: "",
+    size: 0,
+    ts: Math.floor(Date.now() / 1000),
+    message: "",
+    checksum: "",
+    hmac: "",
+    ...fields,
+  };
+}
+
 export function useSession(name: string, active: boolean) {
+  const nameRef = useRef(name);
+  nameRef.current = name;
+  const [connectionGeneration, reconnect] = useState(0);
+  const [roomPending, setRoomPending] = useState(false);
+  const [roomError, setRoomError] = useState("");
+  const [candidateCount, setCandidateCount] = useState(0);
+  const roomTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const identity = useMemo<KeyPair>(() => generateKeyPair(), []);
-  const clientRef = useRef<RelayClient | null>(null);
+  const clientRef = useRef<CoordinatorClient | null>(null);
+  const linksRef = useRef<LinkRegistry | null>(null);
 
   const [status, setStatus] = useState<ConnectionStatus>("idle");
   const [code, setCode] = useState("");
   const [peers, setPeers] = useState<Peer[]>([]);
-  // This tab's own relay id, and the ids of this browser's other tabs.
-  // The relay cannot tell those apart from other people on the same
-  // address, so they are filtered here rather than there. See tabs.ts.
   const [selfPeerId, setSelfPeerId] = useState("");
   const siblingTabs = useSiblingTabs(selfPeerId);
   const siblingTabsRef = useRef(siblingTabs);
   siblingTabsRef.current = siblingTabs;
-  // The roster exactly as the relay sent it, kept so the visible list can
-  // be recomputed when a sibling tab opens or closes without waiting for
-  // the relay to send a fresh one.
-  const rosterRef = useRef<Peer[]>([]);
+
+  const candidatesRef = useRef(new Map<string, Candidate>());
+  const profilesRef = useRef(new Map<string, Peer>());
   const [fingerprints, setFingerprints] = useState<Record<string, string>>({});
   const [outgoing, setOutgoing] = useState<OutgoingItem[]>([]);
   const [incoming, setIncoming] = useState<IncomingItem[]>([]);
@@ -250,34 +255,37 @@ export function useSession(name: string, active: boolean) {
 
   const outgoingRef = useRef(new Map<string, OutgoingItem>());
   const incomingRef = useRef(new Map<string, IncomingItem>());
-  const transferOwner = useRef(new Map<string, string>());
-  // One transfer at a time per peer; the rest wait. Two concurrent
-  // uploads to the same person would race for the same transfer_ready,
-  // and would interleave frames on a shared data channel.
   const busyPeers = useRef(new Set<string>());
   const queued = useRef<string[]>([]);
+  const activeSends = useRef(0);
+  const beginSend = useRef<(requestId: string) => void>(() => {});
+  const sendAborts = useRef(new Map<string, AbortController>());
 
-  const linksRef = useRef<LinkRegistry | null>(null);
-  /** The one direct download in flight per peer, and where its bytes go. */
+  const openingReceive = useRef(new Map<string, string>());
   const activeReceive = useRef(
     new Map<
       string,
       {
-        requestId: string;
+        peerId: string;
         sink: DownloadSink;
-        /** Sealed bytes taken in so far, for the progress bar. */
         received: number;
+        expected: number;
+        ended: boolean;
+        finishing: boolean;
         report: (bytes: number) => void;
       }
     >(),
   );
-  /** Senders waiting for the receiver to confirm its download is open. */
-  const readyWaiters = useRef(
-    new Map<string, { resolve: () => void; reject: (err: Error) => void }>(),
+  const transferWaiters = useRef(
+    new Map<
+      string,
+      {
+        ready: () => void;
+        complete: () => void;
+        reject: (err: Error) => void;
+      }
+    >(),
   );
-  // pumpQueue starts a send, and a finished send pumps the queue again.
-  // One of the two references has to be late-bound; this is it.
-  const beginSend = useRef<(requestId: string) => void>(() => {});
 
   const syncOutgoing = () => setOutgoing([...outgoingRef.current.values()]);
   const syncIncoming = () => setIncoming([...incomingRef.current.values()]);
@@ -302,49 +310,11 @@ export function useSession(name: string, active: boolean) {
     [],
   );
 
-  /** Starts the next queued send for a peer that has gone idle. */
-  const pumpQueue = useCallback(() => {
-    if (!clientRef.current) return;
-    const stillQueued: string[] = [];
-    for (const requestId of queued.current) {
-      const item = outgoingRef.current.get(requestId);
-      if (!item || item.state !== "offered") continue;
-      if (busyPeers.current.has(item.peerId)) {
-        stillQueued.push(requestId);
-        continue;
-      }
-      busyPeers.current.add(item.peerId);
-      patchOutgoing(requestId, { state: "sending" });
-      beginSend.current(requestId);
-    }
-    queued.current = stillQueued;
-  }, [patchOutgoing]);
-
-  const releasePeer = useCallback(
-    (peerId: string) => {
-      busyPeers.current.delete(peerId);
-      pumpQueue();
-    },
-    [pumpQueue],
-  );
-
-  /**
-   * Turn the relay's roster into the list of actual other people.
-   *
-   * Runs both when a roster arrives and when the set of sibling tabs
-   * changes, because opening a second tab has to remove a name from the
-   * first tab's list without the relay having anything new to say.
-   */
-  const applyRoster = useCallback(() => {
-    const visible = rosterRef.current.filter(
-      (peer) => !siblingTabsRef.current.has(peer.id),
+  const publishPeers = useCallback(() => {
+    const visible = [...profilesRef.current.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
     );
     setPeers(visible);
-    // A peer that left and came back has a new id and new keys, so its
-    // old connection is worthless and must be renegotiated. Sibling tabs
-    // are excluded here too: there is no reason to negotiate a direct
-    // connection with another tab of this same browser.
-    linksRef.current?.retain(visible.map((peer) => peer.id));
     void (async () => {
       const next: Record<string, string> = {};
       for (const peer of visible) {
@@ -357,46 +327,521 @@ export function useSession(name: string, active: boolean) {
     })();
   }, [identity]);
 
-  useEffect(() => {
-    applyRoster();
-  }, [siblingTabs, applyRoster]);
+  const peerName = useCallback(
+    (id: string) => profilesRef.current.get(id)?.name ?? "Nearby user",
+    [],
+  );
+
+  const pumpQueue = useCallback(() => {
+    while (activeSends.current < MAX_CONCURRENT_PAYLOADS) {
+      const index = queued.current.findIndex((requestId) => {
+        const item = outgoingRef.current.get(requestId);
+        return Boolean(
+          item &&
+          item.state === "offered" &&
+          !busyPeers.current.has(item.peerId),
+        );
+      });
+      if (index < 0) return;
+      const [requestId] = queued.current.splice(index, 1);
+      const item = outgoingRef.current.get(requestId);
+      if (!item) continue;
+      busyPeers.current.add(item.peerId);
+      activeSends.current += 1;
+      patchOutgoing(requestId, { state: "sending" });
+      beginSend.current(requestId);
+    }
+  }, [patchOutgoing]);
+
+  const releaseSend = useCallback(
+    (peerId: string) => {
+      if (busyPeers.current.delete(peerId)) {
+        activeSends.current = Math.max(0, activeSends.current - 1);
+      }
+      pumpQueue();
+    },
+    [pumpQueue],
+  );
+
+  const sendDirectEnvelope = useCallback(
+    (peerId: string, envelope: Envelope) => {
+      const link = linksRef.current?.peek(peerId);
+      if (!link?.open)
+        throw new Error("that person is no longer reachable locally");
+      link.sendControl({ t: "envelope", envelope });
+    },
+    [],
+  );
+
+  const handleEnvelope = useCallback(
+    (from: string, envelope: Envelope) => {
+      if (envelope.kind === ENVELOPE_KINDS.message) {
+        const text = String(envelope.message ?? "")
+          .slice(0, MAX_TEXT_LENGTH)
+          .trim();
+        if (!text) return;
+        setChat((lines) => [
+          ...lines,
+          {
+            id: `${from}-${Date.now()}-${lines.length}`,
+            peerIds: [from],
+            from: peerName(from),
+            text,
+            at: Date.now(),
+            outbound: false,
+          },
+        ]);
+        return;
+      }
+
+      if (envelope.kind === ENVELOPE_KINDS.fileOffer) {
+        const requestId = envelope.request_id ?? "";
+        const streamId = envelope.stream_id ?? "";
+        if (
+          !REQUEST_ID.test(requestId) ||
+          !STREAM_ID.test(streamId) ||
+          !Number.isSafeInteger(envelope.size) ||
+          envelope.size < 0
+        ) {
+          return;
+        }
+        if (incomingRef.current.has(requestId)) return;
+        const item: IncomingItem = {
+          requestId,
+          from,
+          fromName: peerName(from),
+          name: sanitizeFilename(envelope.name),
+          size: envelope.size,
+          streamId,
+          state: "pending",
+          at: Date.now(),
+          note: envelope.message
+            ? String(envelope.message).slice(0, 200)
+            : undefined,
+        };
+        incomingRef.current.set(requestId, item);
+        syncIncoming();
+        return;
+      }
+
+      if (envelope.kind === ENVELOPE_KINDS.fileRequest) {
+        const requestId = envelope.request_id ?? "";
+        const item = outgoingRef.current.get(requestId);
+        if (!item || item.peerId !== from || item.state !== "offered") return;
+        if (!queued.current.includes(requestId)) queued.current.push(requestId);
+        pumpQueue();
+        return;
+      }
+
+      if (envelope.kind === ENVELOPE_KINDS.fileReject) {
+        const requestId = envelope.request_id ?? "";
+        const item = outgoingRef.current.get(requestId);
+        if (item?.peerId === from)
+          patchOutgoing(requestId, { state: "declined" });
+      }
+    },
+    [patchOutgoing, peerName, pumpQueue],
+  );
+
+  const failReceive = useCallback(
+    (requestId: string, reason: string) => {
+      openingReceive.current.delete(requestId);
+      const activeItem = activeReceive.current.get(requestId);
+      activeReceive.current.delete(requestId);
+      activeItem?.sink.abort(reason);
+      const item = incomingRef.current.get(requestId);
+      if (
+        !item ||
+        item.state === "done" ||
+        item.state === "declined" ||
+        item.state === "failed"
+      )
+        return;
+      patchIncoming(requestId, { state: "failed", error: reason });
+      const link = linksRef.current?.peek(item.from);
+      try {
+        link?.sendControl({ t: "abort", requestId, error: reason });
+      } catch {
+        /* Peer left. */
+      }
+      link?.closePayload(requestId);
+    },
+    [patchIncoming],
+  );
+
+  const finishReceive = useCallback(
+    (requestId: string) => {
+      const activeItem = activeReceive.current.get(requestId);
+      if (
+        !activeItem ||
+        activeItem.finishing ||
+        !activeItem.ended ||
+        activeItem.received !== activeItem.expected
+      )
+        return;
+      activeItem.finishing = true;
+      patchIncoming(requestId, { state: "verifying" });
+      void activeItem.sink
+        .close()
+        .then(() => {
+          if (activeReceive.current.get(requestId) !== activeItem) return;
+          activeReceive.current.delete(requestId);
+          patchIncoming(requestId, { state: "done" });
+          const link = linksRef.current?.peek(activeItem.peerId);
+          try {
+            link?.sendControl({ t: "complete", requestId });
+          } catch {
+            /* Download has completed. */
+          }
+          link?.closePayload(requestId);
+        })
+        .catch((error) => failReceive(requestId, describe(error)));
+    },
+    [patchIncoming, failReceive],
+  );
+
+  const handlePayloadOpen = useCallback(
+    async (peerId: string, requestId: string) => {
+      const item = incomingRef.current.get(requestId);
+      const link = linksRef.current?.peek(peerId);
+      if (!item || item.from !== peerId || item.state !== "approved" || !link)
+        return;
+      if (
+        openingReceive.current.has(requestId) ||
+        activeReceive.current.has(requestId)
+      )
+        return;
+      if (
+        activeReceive.current.size + openingReceive.current.size >=
+        MAX_CONCURRENT_PAYLOADS
+      ) {
+        link.sendControl({
+          t: "abort",
+          requestId,
+          error:
+            "This device is already receiving four files. Send this one again when a transfer finishes.",
+        });
+        patchIncoming(requestId, {
+          state: "failed",
+          error:
+            "Already receiving four files. Ask the sender to try again shortly.",
+        });
+        link.closePayload(requestId);
+        return;
+      }
+      openingReceive.current.set(requestId, peerId);
+      try {
+        const client = clientRef.current;
+        if (!client) throw new Error("the local session closed");
+        const shared = await client.sharedWith(peerId);
+        const streamKey = await deriveStreamKey(shared, fromHex(item.streamId));
+        const sink = await startDirectDownload({
+          transferId: requestId,
+          filename: item.name,
+          plaintextSize: item.size,
+          streamKey,
+        });
+        if (openingReceive.current.get(requestId) !== peerId || !link.open) {
+          sink.abort("The connection closed before the download started.");
+          return;
+        }
+        openingReceive.current.delete(requestId);
+        activeReceive.current.set(requestId, {
+          peerId,
+          sink,
+          received: 0,
+          expected: cipherSizeFor(item.size),
+          ended: false,
+          finishing: false,
+          report: throttleProgress((bytes) =>
+            patchIncoming(requestId, { receivedBytes: bytes }),
+          ),
+        });
+        void sink.finished.catch((error) =>
+          failReceive(requestId, describe(error)),
+        );
+        patchIncoming(requestId, {
+          state: "receiving",
+          receivedBytes: 0,
+        });
+        link.sendControl({ t: "ready", requestId });
+      } catch (err) {
+        openingReceive.current.delete(requestId);
+        const error = describe(err);
+        patchIncoming(requestId, { state: "failed", error });
+        try {
+          link.sendControl({ t: "abort", requestId, error });
+        } catch {
+          // The direct link failed before the abort could be delivered.
+        } finally {
+          link.closePayload(requestId);
+        }
+      }
+    },
+    [patchIncoming, failReceive],
+  );
+
+  const handlePayloadData = useCallback(
+    async (peerId: string, requestId: string, bytes: Uint8Array) => {
+      const activeItem = activeReceive.current.get(requestId);
+      if (!activeItem || activeItem.peerId !== peerId) return;
+      try {
+        if (activeItem.received + bytes.length > activeItem.expected) {
+          throw new Error("peer sent more file data than offered");
+        }
+        await activeItem.sink.write(bytes);
+        activeItem.received += bytes.length;
+        activeItem.report(activeItem.received);
+        finishReceive(requestId);
+      } catch (err) {
+        activeReceive.current.delete(requestId);
+        const error = describe(err);
+        activeItem.sink.abort(error);
+        patchIncoming(requestId, { state: "failed", error });
+        const link = linksRef.current?.peek(peerId);
+        link?.sendControl({ t: "abort", requestId, error });
+        link?.closePayload(requestId);
+      }
+    },
+    [finishReceive, patchIncoming],
+  );
+
+  const handlePayloadClosed = useCallback(
+    (requestId: string) => {
+      if (
+        activeReceive.current.has(requestId) ||
+        openingReceive.current.has(requestId)
+      ) {
+        failReceive(
+          requestId,
+          "The file connection closed before completion. Ask the sender to try again.",
+        );
+      }
+    },
+    [failReceive],
+  );
+
+  const handleControl = useCallback(
+    (peerId: string, message: ChannelControl) => {
+      if (message.t === "profile") {
+        const candidate = candidatesRef.current.get(peerId);
+        if (!candidate || siblingTabsRef.current.has(peerId)) return;
+        profilesRef.current.set(peerId, {
+          ...candidate,
+          name: sanitizePeerName(message.name),
+        });
+        publishPeers();
+        return;
+      }
+      if (message.t === "envelope") {
+        handleEnvelope(peerId, message.envelope);
+        return;
+      }
+      const outgoingItem = outgoingRef.current.get(message.requestId);
+      const waiters =
+        outgoingItem?.peerId === peerId
+          ? transferWaiters.current.get(message.requestId)
+          : undefined;
+      if (message.t === "ready") {
+        waiters?.ready();
+        return;
+      }
+      if (message.t === "complete") {
+        waiters?.complete();
+        return;
+      }
+      if (message.t === "end") {
+        const activeItem = activeReceive.current.get(message.requestId);
+        if (!activeItem || activeItem.peerId !== peerId) return;
+        activeItem.ended = true;
+        finishReceive(message.requestId);
+        return;
+      }
+
+      const error = message.error || "the transfer was cancelled";
+      waiters?.reject(new Error(error));
+      if (outgoingItem?.peerId === peerId)
+        sendAborts.current.get(message.requestId)?.abort(error);
+      const activeItem = activeReceive.current.get(message.requestId);
+      if (activeItem?.peerId === peerId) {
+        activeReceive.current.delete(message.requestId);
+        activeItem.sink.abort(error);
+        patchIncoming(message.requestId, { state: "failed", error });
+      }
+    },
+    [finishReceive, handleEnvelope, patchIncoming, publishPeers],
+  );
+
+  const handleLinkClosed = useCallback(
+    (peerId: string) => {
+      if (profilesRef.current.delete(peerId)) publishPeers();
+      const error =
+        "The local connection closed. Send the file again after reconnecting.";
+      for (const [requestId, item] of incomingRef.current) {
+        if (
+          item.from === peerId &&
+          (item.state === "pending" || item.state === "approved")
+        )
+          failReceive(requestId, error);
+      }
+      for (const [requestId, item] of outgoingRef.current) {
+        if (item.peerId === peerId && item.state === "offered")
+          patchOutgoing(requestId, { state: "failed", error });
+      }
+      for (const [requestId, waiters] of transferWaiters.current) {
+        if (outgoingRef.current.get(requestId)?.peerId !== peerId) continue;
+        waiters.reject(new Error(error));
+        sendAborts.current.get(requestId)?.abort(error);
+      }
+      for (const [requestId, activeItem] of activeReceive.current) {
+        if (activeItem.peerId !== peerId) continue;
+        activeReceive.current.delete(requestId);
+        activeItem.sink.abort(error);
+        patchIncoming(requestId, { state: "failed", error });
+      }
+    },
+    [patchIncoming, patchOutgoing, publishPeers, failReceive],
+  );
+
+  const applyCandidates = useCallback(() => {
+    const allowed = [...candidatesRef.current.values()].filter(
+      (candidate) => !siblingTabsRef.current.has(candidate.id),
+    );
+    setCandidateCount(allowed.length);
+    const ids = new Set(allowed.map((candidate) => candidate.id));
+    for (const id of [...profilesRef.current.keys()]) {
+      if (!ids.has(id)) profilesRef.current.delete(id);
+    }
+    linksRef.current?.retain([...ids]);
+    linksRef.current?.discover([...ids]);
+    publishPeers();
+  }, [publishPeers]);
 
   useEffect(() => {
-    if (!active || !name) return;
+    applyCandidates();
+  }, [siblingTabs, applyCandidates]);
 
-    const client = new RelayClient(RELAY_WS, identity, name);
+  const startSend = useCallback(
+    async (requestId: string) => {
+      const client = clientRef.current;
+      const item = outgoingRef.current.get(requestId);
+      const link = item ? linksRef.current?.peek(item.peerId) : undefined;
+      if (!client || !item || !link?.open) {
+        if (item) {
+          patchOutgoing(requestId, {
+            state: "failed",
+            error: "that person is no longer reachable on your local network",
+          });
+          releaseSend(item.peerId);
+        }
+        return;
+      }
+
+      let readyResolve = () => {};
+      let completeResolve = () => {};
+      let rejectBoth = (_err: Error) => {};
+      const ready = new Promise<void>((resolve, reject) => {
+        readyResolve = resolve;
+        rejectBoth = reject;
+      });
+      const complete = new Promise<void>((resolve, reject) => {
+        completeResolve = resolve;
+        const previous = rejectBoth;
+        rejectBoth = (err) => {
+          previous(err);
+          reject(err);
+        };
+      });
+      // The receiver can abort before file streaming reaches the point where
+      // completion is awaited. Attach a handler now to avoid a transient
+      // unhandled rejection while preserving the rejection for the later await.
+      void ready.catch(() => undefined);
+      void complete.catch(() => undefined);
+      transferWaiters.current.set(requestId, {
+        ready: readyResolve,
+        complete: completeResolve,
+        reject: rejectBoth,
+      });
+      const abort = new AbortController();
+      sendAborts.current.set(requestId, abort);
+
+      try {
+        if (!(await link.openPayload(requestId))) {
+          throw new Error("could not open a local file connection");
+        }
+        await withTimeout(
+          ready,
+          CONTROL_TIMEOUT_MS,
+          "the other device did not start the approved download",
+        );
+        const shared = await client.sharedWith(item.peerId);
+        const streamKey = await importAesKey(
+          await deriveStreamKey(shared, item.streamId),
+        );
+        await sendOverChannel({
+          channel: {
+            sendData: (bytes) => link.sendData(requestId, bytes),
+          },
+          source: item.openStream(),
+          streamKey,
+          signal: abort.signal,
+          onProgress: throttleProgress((sent) =>
+            patchOutgoing(requestId, { sentBytes: sent }),
+          ),
+        });
+        link.sendControl({ t: "end", requestId });
+        await withTimeout(
+          complete,
+          COMPLETE_TIMEOUT_MS,
+          "the other device did not confirm the completed file",
+        );
+        patchOutgoing(requestId, { state: "done" });
+      } catch (err) {
+        const error = describe(err);
+        patchOutgoing(requestId, { state: "failed", error });
+        try {
+          link.sendControl({ t: "abort", requestId, error });
+        } catch {
+          // The connection itself failed.
+        }
+      } finally {
+        transferWaiters.current.delete(requestId);
+        sendAborts.current.delete(requestId);
+        link.closePayload(requestId);
+        releaseSend(item.peerId);
+      }
+    },
+    [patchOutgoing, releaseSend],
+  );
+
+  useEffect(() => {
+    beginSend.current = (requestId) => void startSend(requestId);
+  }, [startSend]);
+
+  useEffect(() => {
+    if (!active || !nameRef.current) return;
+    setNetworkGrouped(true);
+
+    const client = new CoordinatorClient(COORDINATOR_WS, identity);
     clientRef.current = client;
 
-    // Signalling is just another sealed envelope, so the relay forwards
-    // offers and candidates without being able to read them and learns
-    // nothing it did not already know.
     if (rtcSupported()) {
       const selfKey = toHex(identity.publicKey);
       linksRef.current = new LinkRegistry(
-        (peerId) => selfKey < (client.peer(peerId)?.pubkey ?? ""),
+        (peerId) => selfKey < (client.candidate(peerId)?.pubkey ?? ""),
         (peerId, signal) => {
-          void client
-            .sendEnvelope(peerId, {
-              kind: signal.kind,
-              from: name,
-              from_ip: "",
-              to: "",
-              name: "",
-              size: 0,
-              ts: Math.floor(Date.now() / 1000),
-              message: signal.payload,
-              checksum: "",
-              hmac: "",
-            })
-            .catch(() => {
-              // A candidate that cannot be delivered just means this
-              // connection will not form, and the relay path still will.
-            });
+          void client.sendSignal(peerId, signal).catch(() => undefined);
         },
         (link) => {
           link.listen({
-            onControl: (message) => handleChannelControl(link.peerId, message),
-            onData: (bytes) => handleChannelData(link.peerId, bytes),
+            onOpen: () =>
+              link.sendControl({ t: "profile", name: nameRef.current }),
+            onControl: (message) => handleControl(link.peerId, message),
+            onPayloadOpen: (requestId) =>
+              handlePayloadOpen(link.peerId, requestId),
+            onPayloadData: (requestId, bytes) =>
+              handlePayloadData(link.peerId, requestId, bytes),
+            onPayloadClosed: handlePayloadClosed,
           });
           link.onDisconnect(() => handleLinkClosed(link.peerId));
         },
@@ -408,479 +853,168 @@ export function useSession(name: string, active: boolean) {
         case "status":
           setStatus(event.status);
           break;
-
         case "created":
+          setRoomPending(false);
+          setRoomError("");
+          if (roomTimer.current) clearTimeout(roomTimer.current);
           setSelfPeerId(event.peerId);
           setCode(event.code);
-          // Entering a room resolves whatever the last complaint was,
-          // most often a failed join of an expired code. Leaving it up
-          // would have the banner contradict the room shown beside it.
           setNotice("");
           window.history.replaceState(null, "", `/r/${event.code}`);
           break;
-
         case "joined":
           setSelfPeerId(event.peerId);
+          if (!event.code) {
+            setCode("");
+            if (window.location.pathname.startsWith("/r/"))
+              window.history.replaceState(null, "", "/app");
+          }
           if (event.code) {
+            setRoomPending(false);
+            setRoomError("");
+            if (roomTimer.current) clearTimeout(roomTimer.current);
             setCode(event.code);
             setNotice("");
             window.history.replaceState(null, "", `/r/${event.code}`);
           }
           break;
-
-        case "roster": {
-          rosterRef.current = event.peers;
-          applyRoster();
+        case "roster":
+          candidatesRef.current = new Map(
+            event.peers.map((candidate) => [candidate.id, candidate]),
+          );
+          applyCandidates();
           break;
-        }
-
-        case "envelope":
-          void handleEnvelope(event.from, event.envelope);
+        case "signal":
+          if (!isRtcSignalKind(event.envelope.kind)) return;
+          void linksRef.current
+            ?.get(event.from)
+            .accept({
+              kind: event.envelope.kind,
+              payload: event.envelope.message,
+            })
+            .catch(() => undefined);
           break;
-
-        case "transferReady":
-          void handleTransferReady(event);
-          break;
-
-        case "transferEnd": {
-          const requestId = transferOwner.current.get(event.transferId);
-          if (requestId && incomingRef.current.has(requestId)) {
-            patchIncoming(requestId, { state: "failed", error: event.status });
-          }
-          break;
-        }
-
         case "peerLeft":
+          linksRef.current?.drop(event.peerId);
+          profilesRef.current.delete(event.peerId);
+          publishPeers();
           break;
-
         case "error":
           if (event.code === "network_busy") {
             setNetworkGrouped(false);
             break;
           }
-          if (event.code === "no_room") {
-            // The code in the address bar is dead. Drop it so a reload
-            // does not fail the same way, and so "Open a room" is offered.
-            window.history.replaceState(null, "", "/");
-            setCode("");
-          }
-          setNotice(event.message);
+          if (
+            [
+              "no_room",
+              "network_mismatch",
+              "room_full",
+              "already_in_room",
+              "bad_request",
+              "capacity",
+              "rate_limited",
+            ].includes(event.code)
+          ) {
+            setRoomPending(false);
+            setRoomError(
+              event.code === "no_room"
+                ? "That room was not found. Check the code and make sure the other person still has it open."
+                : event.message,
+            );
+            if (roomTimer.current) clearTimeout(roomTimer.current);
+            if (event.code === "no_room" || event.code === "network_mismatch") {
+              window.history.replaceState(null, "", "/app");
+              setCode("");
+            }
+          } else setNotice(event.message);
           break;
       }
     });
 
     client.connect();
-    const initial = roomCodeFromLocation();
     client.hello();
-    if (initial) client.joinRoom(initial);
+    const initial = roomCodeFromLocation();
+    if (initial) {
+      setRoomPending(true);
+      roomTimer.current = setTimeout(() => {
+        setRoomPending(false);
+        setRoomError(
+          "The room did not respond. Check your connection and try again.",
+        );
+        window.history.replaceState(null, "", "/app");
+        setCode("");
+        reconnect((value) => value + 1);
+      }, CONTROL_TIMEOUT_MS);
+      client.joinRoom(initial);
+    }
 
     return () => {
       unsubscribe();
+      if (roomTimer.current) clearTimeout(roomTimer.current);
       client.close();
       clientRef.current = null;
       linksRef.current?.closeAll();
       linksRef.current = null;
+      candidatesRef.current.clear();
+      profilesRef.current.clear();
+      setPeers([]);
+      setCandidateCount(0);
     };
+    // Session callbacks intentionally bind to this session's name and keys.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, name]);
-
-  const peerName = useCallback(
-    (id: string) => clientRef.current?.peer(id)?.name ?? "someone",
-    [],
-  );
-
-  const handleEnvelope = useCallback(
-    async (from: string, envelope: Envelope) => {
-      const client = clientRef.current;
-      if (!client) return;
-
-      if (isRtcSignalKind(envelope.kind)) {
-        // An offer arriving is itself the signal that this peer wants a
-        // connection, so creating the link here is what answers it.
-        await linksRef.current
-          ?.get(from)
-          .accept({ kind: envelope.kind, payload: envelope.message });
-        return;
-      }
-
-      if (envelope.kind === ENVELOPE_KINDS.message) {
-        setChat((lines) => [
-          ...lines,
-          {
-            id: `${from}-${envelope.ts}-${lines.length}`,
-            peerIds: [from],
-            from: envelope.from || peerName(from),
-            text: envelope.message,
-            // Trust the local clock for ordering. A peer's timestamp
-            // orders their own messages fine but can sit anywhere
-            // relative to ours if their clock is off.
-            at: Date.now(),
-            outbound: false,
-          },
-        ]);
-        return;
-      }
-
-      if (envelope.kind === ENVELOPE_KINDS.fileOffer) {
-        const item: IncomingItem = {
-          requestId: envelope.request_id ?? "",
-          from,
-          fromName: envelope.from || peerName(from),
-          name: envelope.name,
-          size: envelope.size,
-          streamId: envelope.stream_id ?? "",
-          state: "pending",
-          at: Date.now(),
-          note: envelope.message || undefined,
-        };
-        incomingRef.current.set(item.requestId, item);
-        syncIncoming();
-        // Negotiate now, while this is being read. Connecting takes a
-        // moment, and starting it at approval would spend that moment
-        // with somebody watching a stalled progress bar.
-        linksRef.current?.get(from).start();
-        return;
-      }
-
-      if (envelope.kind === ENVELOPE_KINDS.fileRequest) {
-        // Approved. Only now does the relay learn a transfer is about to
-        // happen, and only now do any bytes move.
-        const requestId = envelope.request_id ?? "";
-        const item = outgoingRef.current.get(requestId);
-        if (!item) return;
-        queued.current.push(requestId);
-        pumpQueue();
-        return;
-      }
-
-      if (envelope.kind === ENVELOPE_KINDS.fileReject) {
-        patchOutgoing(envelope.request_id ?? "", { state: "declined" });
-      }
-    },
-    [patchOutgoing, peerName, pumpQueue],
-  );
-
-  const handleTransferReady = useCallback(
-    async (event: {
-      transferId: string;
-      token: string;
-      role: "sender" | "receiver";
-      peerId: string;
-      size: number;
-    }) => {
-      const client = clientRef.current;
-      if (!client) return;
-
-      if (event.role === "sender") {
-        const item = [...outgoingRef.current.values()].find(
-          (o) => o.peerId === event.peerId && o.state === "sending",
-        );
-        if (!item) return;
-        transferOwner.current.set(event.transferId, item.requestId);
-        try {
-          const shared = await client.sharedWith(event.peerId);
-          const streamKey = await importAesKey(
-            await deriveStreamKey(shared, item.streamId),
-          );
-          await uploadStream({
-            relayBase: RELAY_BASE,
-            transferId: event.transferId,
-            token: event.token,
-            source: item.openStream(),
-            totalBytes: item.size,
-            streamKey,
-            onProgress: throttleProgress((sent) =>
-              patchOutgoing(item.requestId, { sentBytes: sent }),
-            ),
-          });
-          patchOutgoing(item.requestId, { state: "done" });
-        } catch (err) {
-          patchOutgoing(item.requestId, { state: "failed", error: describe(err) });
-        } finally {
-          releasePeer(event.peerId);
-        }
-        return;
-      }
-
-      const item = [...incomingRef.current.values()].find(
-        (o) => o.from === event.peerId && o.state === "approved",
-      );
-      if (!item) return;
-      transferOwner.current.set(event.transferId, item.requestId);
-      try {
-        const shared = await client.sharedWith(event.peerId);
-        const streamKey = await deriveStreamKey(shared, fromHex(item.streamId));
-        patchIncoming(item.requestId, { state: "receiving", path: "relayed" });
-        await startDownload({
-          relayBase: RELAY_BASE,
-          transferId: event.transferId,
-          token: event.token,
-          filename: item.name,
-          plaintextSize: item.size,
-          streamKey,
-        });
-        patchIncoming(item.requestId, { state: "done" });
-      } catch (err) {
-        patchIncoming(item.requestId, { state: "failed", error: describe(err) });
-      }
-    },
-    [patchIncoming, patchOutgoing, releasePeer],
-  );
-
-  /**
-   * Sends one approved transfer, direct if a connection is up and over
-   * the relay if not.
-   *
-   * The relay branch stops here: `transfer_ready` arrives separately and
-   * `handleTransferReady` owns the rest of it, including releasing the
-   * peer. The direct branch runs to completion inside this call.
-   */
-  const startSend = useCallback(
-    async (requestId: string) => {
-      const client = clientRef.current;
-      const item = outgoingRef.current.get(requestId);
-      if (!client || !item) return;
-
-      const link = linksRef.current?.peek(item.peerId);
-      const direct = link ? await link.waitOpen(DIRECT_WAIT_MS) : false;
-
-      if (!link || !direct) {
-        patchOutgoing(requestId, { path: "relayed" });
-        client.beginTransfer(item.peerId, cipherSizeFor(item.size));
-        return;
-      }
-
-      patchOutgoing(requestId, { path: "direct" });
-      try {
-        const shared = await client.sharedWith(item.peerId);
-        const streamKey = await importAesKey(
-          await deriveStreamKey(shared, item.streamId),
-        );
-
-        // The receiver's download has to exist before any bytes move: the
-        // port feeding it queues without limit, so this is the one hop
-        // backpressure could not otherwise reach.
-        const ready = new Promise<void>((resolve, reject) => {
-          readyWaiters.current.set(requestId, { resolve, reject });
-        });
-        link.sendControl({ t: "begin", requestId, size: item.size });
-        await withTimeout(
-          ready,
-          DIRECT_WAIT_MS,
-          "the other side never started the download",
-        );
-
-        await sendOverChannel({
-          channel: link,
-          source: item.openStream(),
-          streamKey,
-          onProgress: throttleProgress((sent) =>
-            patchOutgoing(requestId, { sentBytes: sent }),
-          ),
-        });
-        link.sendControl({ t: "end", requestId });
-        patchOutgoing(requestId, { state: "done" });
-      } catch (err) {
-        // Deliberately not retried over the relay. Splicing a
-        // half-delivered stream onto a second transport is how a file
-        // gets quietly corrupted rather than loudly failed.
-        patchOutgoing(requestId, { state: "failed", error: describe(err) });
-        try {
-          link.sendControl({ t: "abort", requestId, error: describe(err) });
-        } catch {
-          // The channel is what failed. Nothing left to tell.
-        }
-      } finally {
-        readyWaiters.current.delete(requestId);
-        releasePeer(item.peerId);
-      }
-    },
-    [patchOutgoing, releasePeer],
-  );
+  }, [active, connectionGeneration]);
 
   useEffect(() => {
-    beginSend.current = (requestId) => void startSend(requestId);
-  }, [startSend]);
-
-  /** Control messages from a peer's data channel. */
-  const handleChannelControl = useCallback(
-    async (peerId: string, message: ChannelControl) => {
-      const client = clientRef.current;
-      const link = linksRef.current?.peek(peerId);
-      if (!client || !link) return;
-
-      if (message.t === "ready") {
-        readyWaiters.current.get(message.requestId)?.resolve();
-        return;
-      }
-
-      if (message.t === "begin") {
-        const item = incomingRef.current.get(message.requestId);
-        // The consent rule is the same on both paths: bytes only move for
-        // an offer this person explicitly approved. A direct connection
-        // does not get to skip that.
-        if (!item || item.state !== "approved") {
-          link.sendControl({
-            t: "abort",
-            requestId: message.requestId,
-            error: "that transfer was not approved",
-          });
-          return;
-        }
-        try {
-          const shared = await client.sharedWith(peerId);
-          const streamKey = await deriveStreamKey(shared, fromHex(item.streamId));
-          const sink = await startDirectDownload({
-            transferId: item.requestId,
-            filename: item.name,
-            plaintextSize: item.size,
-            streamKey,
-          });
-          activeReceive.current.set(peerId, {
-            requestId: item.requestId,
-            sink,
-            received: 0,
-            report: throttleProgress((bytes) =>
-              patchIncoming(item.requestId, { receivedBytes: bytes }),
-            ),
-          });
-          patchIncoming(item.requestId, {
-            state: "receiving",
-            path: "direct",
-            receivedBytes: 0,
-          });
-          link.sendControl({ t: "ready", requestId: item.requestId });
-        } catch (err) {
-          patchIncoming(item.requestId, {
-            state: "failed",
-            error: describe(err),
-          });
-          link.sendControl({
-            t: "abort",
-            requestId: item.requestId,
-            error: describe(err),
-          });
-        }
-        return;
-      }
-
-      const active = activeReceive.current.get(peerId);
-      if (!active || active.requestId !== message.requestId) return;
-      activeReceive.current.delete(peerId);
-
-      if (message.t === "end") {
-        active.sink.close();
-        patchIncoming(message.requestId, { state: "done" });
-        return;
-      }
-      active.sink.abort(message.error);
-      patchIncoming(message.requestId, {
-        state: "failed",
-        error: message.error,
-      });
-    },
-    [patchIncoming],
-  );
-
-  /**
-   * Payload frames from a peer's data channel. Awaiting the write is what
-   * applies backpressure: the link handles messages one at a time, so a
-   * slow disk slows the reads, which fills the channel buffer, which
-   * pauses the sender.
-   */
-  const handleChannelData = useCallback(
-    async (peerId: string, bytes: Uint8Array) => {
-      const active = activeReceive.current.get(peerId);
-      if (!active) return;
+    for (const peer of profilesRef.current.values()) {
       try {
-        await active.sink.write(bytes);
-        active.received += bytes.length;
-        active.report(active.received);
-      } catch (err) {
-        activeReceive.current.delete(peerId);
-        active.sink.abort(describe(err));
-        patchIncoming(active.requestId, {
-          state: "failed",
-          error: describe(err),
-        });
+        linksRef.current?.peek(peer.id)?.sendControl({ t: "profile", name });
+      } catch {
+        /* Reconnecting. */
       }
-    },
-    [patchIncoming],
-  );
+    }
+  }, [name]);
 
-  /** A dropped connection fails whatever was riding on it, both ways. */
-  const handleLinkClosed = useCallback(
-    (peerId: string) => {
-      const active = activeReceive.current.get(peerId);
-      if (active) {
-        activeReceive.current.delete(peerId);
-        const error = "the direct connection dropped";
-        active.sink.abort(error);
-        patchIncoming(active.requestId, { state: "failed", error });
-      }
-      for (const [requestId, waiter] of readyWaiters.current) {
-        if (outgoingRef.current.get(requestId)?.peerId !== peerId) continue;
-        waiter.reject(new Error("the direct connection dropped"));
-      }
-    },
-    [patchIncoming],
-  );
-
-  /** Sends a text message. No data plane: the text rides in the envelope. */
   const sendText = useCallback(
     async (targets: string[], text: string) => {
-      const client = clientRef.current;
-      const trimmed = text.trim();
-      if (!client || !trimmed || targets.length === 0) return;
-
-      const at = Math.floor(Date.now() / 1000);
+      const trimmed = text.trim().slice(0, MAX_TEXT_LENGTH);
+      if (!trimmed || targets.length === 0) return false;
+      const at = Date.now();
+      const delivered: string[] = [];
       for (const to of targets) {
         try {
-          await client.sendEnvelope(to, {
-            kind: ENVELOPE_KINDS.message,
-            from: name,
-            from_ip: "",
-            to: peerName(to),
-            name: "",
-            size: 0,
-            ts: at,
-            message: trimmed,
-            checksum: "",
-            hmac: "",
-          });
+          sendDirectEnvelope(
+            to,
+            envelopeFor(ENVELOPE_KINDS.message, name, { message: trimmed }),
+          );
+          delivered.push(to);
         } catch (err) {
           setNotice(describe(err));
         }
       }
+      if (delivered.length === 0) return false;
       setChat((lines) => [
         ...lines,
         {
           id: `me-${at}-${lines.length}`,
-          peerIds: [...targets],
+          peerIds: delivered,
           from: name,
           text: trimmed,
-          at: Date.now(),
+          at,
           outbound: true,
         },
       ]);
+      if (delivered.length < targets.length)
+        setNotice(
+          `Message sent to ${delivered.length} of ${targets.length} people. Others disconnected.`,
+        );
+      return true;
     },
-    [name, peerName],
+    [name, sendDirectEnvelope],
   );
 
-  /**
-   * Offers files. Every recipient gets their own offer, sealed to them,
-   * because a shared secret is per-pair — there is no way to encrypt once
-   * and send to everybody.
-   */
   const sendFiles = useCallback(
     async (targets: string[], files: File[], asFolder = false) => {
-      const client = clientRef.current;
-      if (!client || targets.length === 0 || files.length === 0) return;
-
-      // A folder becomes exactly one payload. Offering each file
-      // separately meant one approval per file, and it could not preserve
-      // the folder anyway: browsers strip path separators out of download
-      // filenames, so everything landed flat. One archive fixes both.
+      if (targets.length === 0 || files.length === 0) return;
       const payloads = asFolder
         ? [
             (() => {
@@ -899,20 +1033,13 @@ export function useSession(name: string, active: boolean) {
             note: "",
             open: () => file.stream() as ReadableStream<Uint8Array>,
           }));
-
-      // One group per payload, spanning its recipients.
       const groups = payloads.map(() => toHex(randomBytes(6)));
-
-      // Start connecting before anything is offered, so the negotiation
-      // overlaps with the time somebody spends deciding.
-      for (const to of targets) linksRef.current?.get(to).start();
 
       for (const to of targets) {
         for (const [index, payload] of payloads.entries()) {
           const requestId = toHex(randomBytes(8));
           const streamId = randomBytes(16);
-
-          outgoingRef.current.set(requestId, {
+          const item: OutgoingItem = {
             requestId,
             peerId: to,
             peerName: peerName(to),
@@ -924,42 +1051,34 @@ export function useSession(name: string, active: boolean) {
             sentBytes: 0,
             at: Date.now(),
             groupId: groups[index],
-          });
+            folder: asFolder,
+          };
+          outgoingRef.current.set(requestId, item);
           syncOutgoing();
-
           try {
-            await client.sendEnvelope(to, {
-              kind: ENVELOPE_KINDS.fileOffer,
-              from: name,
-              from_ip: "",
-              to: peerName(to),
-              name: payload.label,
-              size: payload.size,
-              ts: Math.floor(Date.now() / 1000),
-              // Carries the folder's file count so the receiver can judge
-              // the offer before approving it.
-              message: payload.note,
-              // Per-chunk AEAD authenticates every byte in flight, so a
-              // whole-file digest would only cost a full read of a
-              // possibly enormous file before anything could start.
-              checksum: "",
-              hmac: "",
-              request_id: requestId,
-              stream_id: toHex(streamId),
-            });
+            sendDirectEnvelope(
+              to,
+              envelopeFor(ENVELOPE_KINDS.fileOffer, name, {
+                name: payload.label,
+                size: payload.size,
+                message: payload.note,
+                request_id: requestId,
+                stream_id: toHex(streamId),
+              }),
+            );
           } catch (err) {
             patchOutgoing(requestId, { state: "failed", error: describe(err) });
           }
         }
       }
     },
-    [name, patchOutgoing, peerName],
+    [name, patchOutgoing, peerName, sendDirectEnvelope],
   );
 
   const approve = useCallback(
     async (item: IncomingItem) => {
-      const client = clientRef.current;
-      if (!client) return;
+      if (incomingRef.current.get(item.requestId)?.state !== "pending") return;
+      patchIncoming(item.requestId, { state: "approved" });
       if (!serviceWorkerSupported()) {
         patchIncoming(item.requestId, {
           state: "failed",
@@ -969,57 +1088,83 @@ export function useSession(name: string, active: boolean) {
       }
       try {
         await registerServiceWorker();
-        patchIncoming(item.requestId, { state: "approved" });
-        await client.sendEnvelope(item.from, {
-          kind: ENVELOPE_KINDS.fileRequest,
-          from: name,
-          from_ip: "",
-          to: item.fromName,
-          name: item.name,
-          size: item.size,
-          ts: Math.floor(Date.now() / 1000),
-          message: "",
-          checksum: "",
-          hmac: "",
-          request_id: item.requestId,
-        });
+        if (incomingRef.current.get(item.requestId)?.state !== "approved")
+          return;
+        sendDirectEnvelope(
+          item.from,
+          envelopeFor(ENVELOPE_KINDS.fileRequest, name, {
+            name: item.name,
+            size: item.size,
+            request_id: item.requestId,
+          }),
+        );
       } catch (err) {
-        patchIncoming(item.requestId, { state: "failed", error: describe(err) });
+        patchIncoming(item.requestId, {
+          state: "failed",
+          error: describe(err),
+        });
       }
     },
-    [name, patchIncoming],
+    [name, patchIncoming, sendDirectEnvelope],
   );
 
   const decline = useCallback(
     async (item: IncomingItem) => {
-      const client = clientRef.current;
-      if (!client) return;
+      if (incomingRef.current.get(item.requestId)?.state !== "pending") return;
       patchIncoming(item.requestId, { state: "declined" });
-      await client.sendEnvelope(item.from, {
-        kind: ENVELOPE_KINDS.fileReject,
-        from: name,
-        from_ip: "",
-        to: item.fromName,
-        name: item.name,
-        size: item.size,
-        ts: Math.floor(Date.now() / 1000),
-        message: "",
-        checksum: "",
-        hmac: "",
-        request_id: item.requestId,
-      });
+      try {
+        sendDirectEnvelope(
+          item.from,
+          envelopeFor(ENVELOPE_KINDS.fileReject, name, {
+            name: item.name,
+            size: item.size,
+            request_id: item.requestId,
+          }),
+        );
+      } catch (err) {
+        setNotice(describe(err));
+      }
     },
-    [name, patchIncoming],
+    [name, patchIncoming, sendDirectEnvelope],
   );
 
-  const createRoom = useCallback(() => clientRef.current?.createRoom(), []);
-  const joinRoom = useCallback((value: string) => clientRef.current?.joinRoom(value), []);
+  const beginRoom = useCallback(
+    (value?: string) => {
+      if (!clientRef.current || roomPending) return;
+      setRoomError("");
+      setRoomPending(true);
+      if (roomTimer.current) clearTimeout(roomTimer.current);
+      roomTimer.current = setTimeout(() => {
+        setRoomPending(false);
+        setRoomError(
+          "The room did not respond. Check your connection and try again.",
+        );
+        window.history.replaceState(null, "", "/app");
+        setCode("");
+        reconnect((value) => value + 1);
+      }, CONTROL_TIMEOUT_MS);
+      if (value) clientRef.current.joinRoom(value.trim().toUpperCase());
+      else clientRef.current.createRoom();
+    },
+    [roomPending],
+  );
+  const createRoom = useCallback(() => beginRoom(), [beginRoom]);
+  const joinRoom = useCallback(
+    (value: string) => beginRoom(value),
+    [beginRoom],
+  );
+  const leaveRoom = useCallback(() => {
+    window.history.replaceState(null, "", "/app");
+    setCode("");
+    setRoomError("");
+    setRoomPending(false);
+    reconnect((value) => value + 1);
+  }, []);
+  const retryConnection = useCallback(
+    () => reconnect((value) => value + 1),
+    [],
+  );
 
-  /**
-   * Every message and transfer as one time-ordered list. Threads are a
-   * filter over this rather than separate stores, so a message and the
-   * file it refers to cannot drift apart in the display.
-   */
   const events = useMemo<ThreadEvent[]>(() => {
     const merged: ThreadEvent[] = [
       ...chat.map((line) => ({
@@ -1047,31 +1192,30 @@ export function useSession(name: string, active: boolean) {
     return merged.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
   }, [chat, incoming, outgoing]);
 
-  /** Files that actually arrived, newest first. */
   const received = useMemo(
-    () => incoming.filter((item) => item.state === "done").sort((a, b) => b.at - a.at),
+    () =>
+      incoming
+        .filter((item) => item.state === "done")
+        .sort((a, b) => b.at - a.at),
     [incoming],
   );
-
   const pendingCount = useMemo(
     () => incoming.filter((item) => item.state === "pending").length,
     [incoming],
   );
 
-  // Unread is per thread and time based, so it survives a peer list that
-  // reorders and needs no per-event read flags.
   const [seenAt, setSeenAt] = useState<Record<string, number>>({});
   const markRead = useCallback((threadId: string) => {
     setSeenAt((current) => ({ ...current, [threadId]: Date.now() }));
   }, []);
-
   const unread = useMemo(() => {
     const out: Record<string, number> = {};
     for (const event of events) {
       if (event.kind === "message" && event.line.outbound) continue;
       if (event.kind === "outgoing") continue;
       for (const peerId of event.peerIds) {
-        if (event.at > (seenAt[peerId] ?? 0)) out[peerId] = (out[peerId] ?? 0) + 1;
+        if (event.at > Math.max(seenAt[peerId] ?? 0, seenAt[EVERYONE] ?? 0))
+          out[peerId] = (out[peerId] ?? 0) + 1;
       }
     }
     return out;
@@ -1080,6 +1224,11 @@ export function useSession(name: string, active: boolean) {
   return {
     status,
     code,
+    roomPending,
+    roomError,
+    candidateCount,
+    leaveRoom,
+    retryConnection,
     peers,
     fingerprints,
     events,

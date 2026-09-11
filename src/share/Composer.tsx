@@ -1,177 +1,197 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, FolderClosed, Paperclip } from "lucide-react";
-
+import { ArrowUp } from "@phosphor-icons/react/dist/csr/ArrowUp";
+import { FolderSimple } from "@phosphor-icons/react/dist/csr/FolderSimple";
+import { Paperclip } from "@phosphor-icons/react/dist/csr/Paperclip";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupTextarea,
+} from "@/components/ui/input-group";
 import { fromDataTransfer } from "./dropped";
 
 interface ComposerProps {
-  /** Who this will reach, already resolved from the active thread. */
   targets: string[];
   destination: string;
-  onSendText: (targets: string[], text: string) => void;
-  onSendFiles: (targets: string[], files: File[], asFolder?: boolean) => void;
+  draft: string;
+  onDraft: (value: string) => void;
+  onSendText: (targets: string[], text: string) => Promise<boolean>;
+  onSendFiles: (
+    targets: string[],
+    files: File[],
+    asFolder?: boolean,
+  ) => Promise<void>;
 }
-
-/** Grows with the draft instead of scrolling inside two fixed rows. */
-const MAX_ROWS_PX = 168;
 
 export function Composer({
   targets,
   destination,
+  draft,
+  onDraft,
   onSendText,
   onSendFiles,
 }: ComposerProps) {
-  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const areaRef = useRef<HTMLTextAreaElement | null>(null);
-  // Drag events fire for every child element entered, so a plain
-  // enter/leave pair flickers. Counting them is the standard fix.
+  const [error, setError] = useState("");
+  const areaRef = useRef<HTMLTextAreaElement>(null);
   const depth = useRef(0);
-
   const canSend = targets.length > 0;
-
   const fit = useCallback(() => {
     const el = areaRef.current;
-    if (!el) return;
+    if (!el || !el.offsetWidth) return;
     el.style.height = "auto";
-    const wanted = Math.min(el.scrollHeight, MAX_ROWS_PX);
-    // An element inside a display:none subtree measures zero, and the
-    // narrow layout hides the stage while the rail is up. Writing that
-    // zero back would pin the field shut at its padding until the first
-    // keystroke, which is exactly what it used to do on a phone.
-    if (wanted === 0) return;
-    el.style.height = `${wanted}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 168)}px`;
   }, []);
-
   useEffect(fit, [draft, fit]);
-
-  // Re-measure the first time it actually has a box. Only the
-  // hidden-to-visible edge triggers this, so the writes above cannot
-  // feed back into the observer.
   useEffect(() => {
     const el = areaRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    let hadBox = el.offsetWidth > 0;
-    const observer = new ResizeObserver(() => {
-      const hasBox = el.offsetWidth > 0;
-      if (hasBox && !hadBox) fit();
-      hadBox = hasBox;
-    });
+    if (!el) return;
+    const observer = new ResizeObserver(fit);
     observer.observe(el);
     return () => observer.disconnect();
   }, [fit]);
 
-  const send = () => {
-    if (!canSend || !draft.trim()) return;
-    onSendText(targets, draft);
-    setDraft("");
+  const send = async () => {
+    if (!canSend || sending || !draft.trim()) return;
+    setSending(true);
+    setError("");
+    try {
+      if (await onSendText(targets, draft)) onDraft("");
+      else
+        setError("That message could not be sent. Your draft is still here.");
+    } catch {
+      setError("That message could not be sent. Try again.");
+    } finally {
+      setSending(false);
+      areaRef.current?.focus();
+    }
   };
-
-  const onDrop = (event: React.DragEvent) => {
-    event.preventDefault();
-    depth.current = 0;
-    setDragging(false);
-    if (!canSend) return;
-    const transfer = event.dataTransfer;
-    void fromDataTransfer(transfer).then(({ files, asFolder }) => {
-      if (files.length > 0) onSendFiles(targets, files, asFolder);
-    });
+  const offer = async (files: File[], folder = false) => {
+    setError("");
+    try {
+      await onSendFiles(targets, files, folder);
+    } catch {
+      setError("Could not read those files. Try choosing them again.");
+    }
   };
-
   return (
     <div className="composer">
-      <div
-        className={dragging ? "composer-box is-dragging" : "composer-box"}
+      <InputGroup
+        className={`composer-box mx-auto max-w-4xl rounded-xl bg-background shadow-xs ${canSend ? "has-disabled:opacity-100 has-disabled:bg-background dark:has-disabled:bg-background" : ""} ${dragging ? "ring-2 ring-primary" : ""}`}
         onDragEnter={(event) => {
           event.preventDefault();
-          depth.current += 1;
+          depth.current++;
           if (canSend) setDragging(true);
         }}
         onDragOver={(event) => event.preventDefault()}
         onDragLeave={() => {
           depth.current = Math.max(0, depth.current - 1);
-          if (depth.current === 0) setDragging(false);
+          if (!depth.current) setDragging(false);
         }}
-        onDrop={onDrop}
+        onDrop={(event) => {
+          event.preventDefault();
+          depth.current = 0;
+          setDragging(false);
+          if (!canSend) return;
+          void fromDataTransfer(event.dataTransfer)
+            .then(({ files, asFolder }) => offer(files, asFolder))
+            .catch(() =>
+              setError(
+                "Could not read that drop. Use the file picker instead.",
+              ),
+            );
+        }}
       >
-        <textarea
+        <InputGroupTextarea
           ref={areaRef}
+          className="min-h-16 px-4 pt-4 pb-2 text-base leading-relaxed"
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={
-            canSend
-              ? `Message ${destination}, or drop a file in here`
-              : "Nobody to send to yet"
-          }
-          aria-label={canSend ? `Message ${destination}` : "Message"}
+          onChange={(event) => onDraft(event.target.value)}
+          placeholder={`Message ${destination}…`}
+          aria-label={`Message ${destination}`}
+          aria-describedby={error ? "composer-error" : undefined}
           disabled={!canSend}
-          rows={2}
+          readOnly={sending}
+          maxLength={16_384}
+          rows={1}
           onKeyDown={(event) => {
-            // Enter sends, Shift+Enter breaks the line. The convention in
-            // every messaging app.
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing
+            ) {
               event.preventDefault();
-              send();
+              void send();
             }
           }}
         />
-
-        <div className="composer-actions">
-          <label className={canSend ? "attach" : "attach is-disabled"}>
-            <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" />
-            <span>Files</span>
-            <input
-              type="file"
-              multiple
-              disabled={!canSend}
-              onChange={(event) => {
-                const files = [...(event.target.files ?? [])];
-                if (files.length) onSendFiles(targets, files);
-                event.target.value = "";
-              }}
-            />
-          </label>
-
-          <label className={canSend ? "attach" : "attach is-disabled"}>
-            <FolderClosed size={14} strokeWidth={1.75} aria-hidden="true" />
-            <span>Folder</span>
-            <input
-              type="file"
-              multiple
-              disabled={!canSend}
-              // Folder picking is vendor-prefixed with no standard
-              // equivalent, so React needs it passed through.
-              {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
-              onChange={(event) => {
-                const files = [...(event.target.files ?? [])];
-                if (files.length) onSendFiles(targets, files, true);
-                event.target.value = "";
-              }}
-            />
-          </label>
-
+        <InputGroupAddon align="block-end" className="gap-1 px-2 pb-2">
+          <Button asChild variant="ghost" className="attach h-11 px-3">
+            <label aria-disabled={!canSend}>
+              <Paperclip size={18} aria-hidden="true" /> <span>Files</span>
+              <Input
+                type="file"
+                multiple
+                disabled={!canSend}
+                onChange={(event) => {
+                  const files = [...(event.target.files ?? [])];
+                  if (files.length) void offer(files);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          </Button>
+          <Button asChild variant="ghost" className="attach h-11 px-3">
+            <label aria-disabled={!canSend}>
+              <FolderSimple size={18} aria-hidden="true" /> <span>Folder</span>
+              <Input
+                type="file"
+                multiple
+                disabled={!canSend}
+                {...({ webkitdirectory: "", directory: "" } as Record<
+                  string,
+                  string
+                >)}
+                onChange={(event) => {
+                  const files = [...(event.target.files ?? [])];
+                  if (files.length) void offer(files, true);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          </Button>
           <span className="spacer" />
-
-          <span className="composer-dest">
-            {canSend ? `goes to ${destination}` : "nobody reachable"}
-          </span>
-
-          <button
+          <Button
             type="button"
-            className="btn-accent"
-            disabled={!canSend || !draft.trim()}
-            onClick={send}
+            className="size-11"
+            size="icon"
+            disabled={!canSend || !draft.trim() || sending}
+            onClick={() => void send()}
+            aria-label={sending ? "Sending message" : "Send message"}
           >
-            Send
-            <ArrowRight size={13} strokeWidth={1.75} aria-hidden="true" />
-          </button>
-        </div>
-
+            <ArrowUp size={20} aria-hidden="true" />
+          </Button>
+        </InputGroupAddon>
         {dragging ? (
           <div className="composer-drop" aria-hidden="true">
-            Drop to offer it to {destination}
+            Drop to offer to {destination}
           </div>
         ) : null}
+      </InputGroup>
+      <div className="composer-footer">
+        <span>To {destination}</span>
+        <span className="composer-hint">
+          Enter to send <span aria-hidden="true">·</span> Shift + Enter for a
+          new line
+        </span>
       </div>
+      {error ? (
+        <p className="composer-error" id="composer-error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

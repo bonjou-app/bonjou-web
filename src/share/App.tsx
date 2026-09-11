@@ -1,129 +1,90 @@
-import { useCallback, useEffect, useState } from "react";
-import { Toaster, toast } from "sonner";
-
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Landing } from "./Landing";
-import { TabTaken } from "./TabTaken";
-import { Workspace } from "./Workspace";
-import { useSessionOwnership } from "./tabs";
 import { useTheme } from "./theme";
-import { useSession } from "./useSession";
 
-/**
- * Two surfaces, one bundle.
- *
- * The page at "/" argues for the product; "/app" is the product. They are
- * switched client-side rather than split into two entries because the
- * session has to survive the move: the marketing page shows a live roster,
- * and reconnecting to the relay just to cross a link would drop it.
- *
- * A room link is the exception that sets the rule. Someone opening
- * "/r/{code}" was handed that link by a person who is waiting for them, so
- * it lands in the workspace directly rather than on an argument for it.
- */
-type View = "site" | "app";
-
-function viewFromLocation(): View {
-  const path = window.location.pathname;
-  if (path.startsWith("/r/")) return "app";
-  if (path === "/app" || path === "/share") return "app";
-  if (new URLSearchParams(window.location.search).get("r")) return "app";
-  return "site";
-}
-
-function storedName(): string {
-  try {
-    return localStorage.getItem("bonjou.name") ?? "";
-  } catch {
-    return "";
-  }
+const ShareApp = lazy(() => import("./ShareApp"));
+function isApp() {
+  return (
+    /^\/(app|share)(\/|$)/.test(location.pathname) ||
+    location.pathname.startsWith("/r/") ||
+    Boolean(new URLSearchParams(location.search).get("r"))
+  );
 }
 
 export default function App() {
-  const [name, setName] = useState(storedName);
-  const [view, setView] = useState<View>(viewFromLocation);
+  const [visible, setVisible] = useState(isApp);
+  const [visited, setVisited] = useState(isApp);
+  const appPath = useRef(
+    isApp() ? location.pathname + location.search : "/app",
+  );
   const theme = useTheme();
-  // One connection per browser. A tab that does not hold the lock never
-  // opens a session, so it never becomes a second entry in anyone's list.
-  const ownership = useSessionOwnership();
-  const owns = ownership.state === "owner";
-  const session = useSession(name, Boolean(name) && owns);
-
-  const commitName = useCallback((value: string) => {
-    try {
-      localStorage.setItem("bonjou.name", value);
-    } catch {
-      // Private browsing refuses storage. The name still works for this
-      // session; it just will not be remembered.
-    }
-    setName(value);
-  }, []);
-
   const openApp = useCallback(() => {
-    if (window.location.pathname !== "/app") {
-      window.history.pushState({ view: "app" }, "", "/app");
-    }
-    setView("app");
+    history.pushState(null, "", appPath.current);
+    setVisible(true);
+    setVisited(true);
     window.scrollTo(0, 0);
   }, []);
-
-  // Back and forward have to work, or the browser's own controls lie.
   useEffect(() => {
-    const onPop = () => setView(viewFromLocation());
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
+    const pop = () => {
+      const next = isApp();
+      setVisible(next);
+      if (next) setVisited(true);
+    };
+    const follow = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      const anchor = (event.target as Element).closest<HTMLAnchorElement>(
+        "a[href='/']",
+      );
+      if (!anchor || !isApp()) return;
+      event.preventDefault();
+      appPath.current = location.pathname + location.search;
+      history.pushState(null, "", "/");
+      setVisible(false);
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener("popstate", pop);
+    document.addEventListener("click", follow);
+    return () => {
+      window.removeEventListener("popstate", pop);
+      document.removeEventListener("click", follow);
+    };
   }, []);
-
-  // The session speaks in one-line notices. sonner renders them as toasts
-  // with a live region and a timer, which is what that hand-rolled banner
-  // was slowly turning into.
-  const { notice, setNotice } = session;
-  useEffect(() => {
-    if (!notice) return;
-    toast(notice);
-    setNotice("");
-  }, [notice, setNotice]);
-
-  // Only the workspace is a presence. The marketing page reads a roster
-  // it does not join, so a blocked tab can still show it.
-  if (view === "app" && !owns) {
-    return (
-      <>
-        <TabTaken onTakeOver={ownership.takeOver} />
-        <Toaster
-          position="bottom-center"
-          theme={theme.resolved}
-          toastOptions={{ className: "bj-toast" }}
-        />
-      </>
-    );
-  }
-
   return (
-    <>
-      {view === "app" ? (
-        <Workspace
-          name={name}
-          onName={commitName}
-          session={session}
-          themeChoice={theme.choice}
-          theme={theme.resolved}
-          onThemeChoice={theme.setChoice}
-          onToggleTheme={theme.toggle}
-        />
-      ) : (
+    <TooltipProvider>
+      {!visible ? (
         <Landing
-          session={session}
           onOpenApp={openApp}
           theme={theme.resolved}
           onToggleTheme={theme.toggle}
         />
-      )}
-
-      <Toaster
-        position="bottom-center"
-        theme={theme.resolved}
-        toastOptions={{ className: "bj-toast" }}
-      />
-    </>
+      ) : null}
+      {visited ? (
+        <Suspense
+          fallback={
+            <main className="app-loading" role="status">
+              Opening your workspace…
+            </main>
+          }
+        >
+          <ShareApp visible={visible} theme={theme} />
+        </Suspense>
+      ) : null}
+    </TooltipProvider>
   );
 }

@@ -1,10 +1,9 @@
 /**
- * Control-plane client for the Bonjou relay.
+ * Browser client for Bonjou's small coordination service.
  *
- * Everything meaningful this class sends is sealed before it leaves the
- * browser: the relay routes on a destination peer id and forwards an
- * opaque payload. Room membership and transfer setup are the only things
- * it can observe.
+ * The service only supplies network-scoped candidate ids, room membership,
+ * public session keys, and an opaque route for encrypted WebRTC signaling.
+ * Names, chat, file metadata, and file bytes never use this connection.
  */
 
 import {
@@ -19,57 +18,41 @@ import {
 
 export interface Peer {
   id: string;
+  /** Filled only after the direct control channel exchanges profiles. */
   name: string;
   pubkey: string;
-  /**
-   * Where this peer came from: "network" means the relay saw them arrive
-   * from the same public address as you, "code" means they entered a
-   * shared code. The distinction matters — a code is a deliberate
-   * invitation, a shared address is only a hint.
-   */
   source: "network" | "code";
 }
 
-export type ConnectionStatus =
-  | "idle"
-  | "connecting"
-  | "connected"
-  | "reconnecting"
-  | "closed";
+export type Candidate = Omit<Peer, "name">;
 
-export type RelayEvent =
+export type ConnectionStatus =
+  "idle" | "connecting" | "connected" | "reconnecting" | "closed";
+
+export type CoordinatorEvent =
   | { type: "status"; status: ConnectionStatus }
   | { type: "created"; code: string; peerId: string }
   | { type: "joined"; code: string; peerId: string }
-  | { type: "roster"; peers: Peer[] }
-  | { type: "envelope"; from: string; envelope: Envelope }
-  | {
-      type: "transferReady";
-      transferId: string;
-      token: string;
-      role: "sender" | "receiver";
-      peerId: string;
-      size: number;
-    }
-  | { type: "transferEnd"; transferId: string; status: string; from: string }
+  | { type: "roster"; peers: Candidate[] }
+  | { type: "signal"; from: string; envelope: Envelope }
   | { type: "peerLeft"; peerId: string }
   | { type: "error"; code: string; message: string };
 
-type Handler = (event: RelayEvent) => void;
+type Handler = (event: CoordinatorEvent) => void;
+
+interface ServerPeer {
+  id: string;
+  pubkey: string;
+  source: "network" | "code";
+}
 
 interface ServerFrame {
   type: string;
   code?: string;
   peer_id?: string;
-  peers?: Peer[];
+  peers?: ServerPeer[];
   from?: string;
   payload?: string;
-  transfer_id?: string;
-  token?: string;
-  role?: string;
-  peer?: string;
-  size?: number;
-  status?: string;
   code_error?: string;
   message?: string;
 }
@@ -77,25 +60,28 @@ interface ServerFrame {
 const RECONNECT_BASE_MS = 500;
 const RECONNECT_MAX_MS = 15_000;
 
-export class RelayClient {
+export class CoordinatorClient {
   private socket: WebSocket | null = null;
   private handlers = new Set<Handler>();
   private sharedSecrets = new Map<string, Uint8Array>();
-  private roster = new Map<string, Peer>();
+  private roster = new Map<string, Candidate>();
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closedByUser = false;
-  /** Set once the room is known, so a reconnect can rejoin it. */
   private saidHello = false;
   private pendingIntent: { action: "create" | "join"; code?: string } | null =
     null;
+
+  private confirmedRoom = "";
+  private awaitingRoom = false;
+  private socketRoom = "";
+  private lobbyPeerId = "";
 
   selfId = "";
 
   constructor(
     private readonly url: string,
     private readonly identity: KeyPair,
-    private displayName: string,
   ) {}
 
   on(handler: Handler): () => void {
@@ -103,15 +89,11 @@ export class RelayClient {
     return () => this.handlers.delete(handler);
   }
 
-  private emit(event: RelayEvent): void {
+  private emit(event: CoordinatorEvent): void {
     for (const handler of this.handlers) handler(event);
   }
 
-  get peers(): Peer[] {
-    return [...this.roster.values()].filter((p) => p.id !== this.selfId);
-  }
-
-  peer(id: string): Peer | undefined {
+  candidate(id: string): Candidate | undefined {
     return this.roster.get(id);
   }
 
@@ -122,26 +104,34 @@ export class RelayClient {
       status: this.reconnectAttempt === 0 ? "connecting" : "reconnecting",
     });
 
+    this.socketRoom = "";
+    this.lobbyPeerId = "";
     const socket = new WebSocket(this.url);
-    socket.binaryType = "arraybuffer";
     this.socket = socket;
 
     socket.onopen = () => {
+      if (this.socket !== socket || this.closedByUser) return;
       this.reconnectAttempt = 0;
       this.emit({ type: "status", status: "connected" });
-      // A reconnect lands in a fresh relay session, so re-announce.
+      this.awaitingRoom = Boolean(this.pendingIntent || this.confirmedRoom);
       if (this.saidHello) this.sendHello();
       if (this.pendingIntent?.action === "create") this.sendCreate();
       else if (this.pendingIntent?.action === "join" && this.pendingIntent.code)
         this.sendJoin(this.pendingIntent.code);
+      else if (this.confirmedRoom) this.sendJoin(this.confirmedRoom);
     };
 
     socket.onmessage = (event) => {
-      void this.handleFrame(event.data as string);
+      if (this.socket !== socket) return;
+      void this.handleFrame(String(event.data));
     };
 
     socket.onclose = () => {
+      if (this.socket !== socket) return;
       this.socket = null;
+      this.roster.clear();
+      this.sharedSecrets.clear();
+      this.emit({ type: "roster", peers: [] });
       if (this.closedByUser) {
         this.emit({ type: "status", status: "closed" });
         return;
@@ -150,7 +140,7 @@ export class RelayClient {
     };
 
     socket.onerror = () => {
-      // onclose always follows, and it owns the reconnect decision.
+      // onclose follows and owns reconnection.
     };
   }
 
@@ -183,79 +173,65 @@ export class RelayClient {
     this.socket.send(JSON.stringify(frame));
   }
 
-  /**
-   * Announces this browser and joins the room shared by everyone on the
-   * same public address. It is the browser's stand-in for the CLI's UDP
-   * broadcast, which no browser is allowed to send.
-   */
   hello(): void {
     this.saidHello = true;
     this.sendHello();
   }
 
   private sendHello(): void {
-    this.send({
-      type: "hello",
-      name: this.displayName,
-      pubkey: toHex(this.identity.publicKey),
-    });
+    this.send({ type: "hello", pubkey: toHex(this.identity.publicKey) });
   }
 
   createRoom(): void {
     this.pendingIntent = { action: "create" };
+    this.awaitingRoom = true;
     this.sendCreate();
   }
 
   joinRoom(code: string): void {
     this.pendingIntent = { action: "join", code };
+    this.awaitingRoom = true;
     this.sendJoin(code);
   }
 
   private sendCreate(): void {
-    this.send({
-      type: "create",
-      name: this.displayName,
-      pubkey: toHex(this.identity.publicKey),
-    });
+    this.send({ type: "create" });
   }
 
   private sendJoin(code: string): void {
-    this.send({
-      type: "join",
-      code,
-      name: this.displayName,
-      pubkey: toHex(this.identity.publicKey),
-    });
+    this.send({ type: "join", code });
   }
 
-  setDisplayName(name: string): void {
-    this.displayName = name;
-  }
-
-  /** Seals an envelope for one peer and hands the ciphertext to the relay. */
-  async sendEnvelope(to: string, envelope: Envelope): Promise<void> {
+  /** Encrypts one WebRTC signaling message for its intended candidate. */
+  async sendSignal(
+    to: string,
+    signal: { kind: string; payload: string },
+  ): Promise<void> {
     const shared = await this.sharedWith(to);
+    const envelope: Envelope = {
+      kind: signal.kind,
+      from: "",
+      from_ip: "",
+      to: "",
+      name: "",
+      size: 0,
+      ts: Math.floor(Date.now() / 1000),
+      message: signal.payload,
+      checksum: "",
+      hmac: "",
+    };
     this.send({
-      type: "relay",
+      type: "signal",
       to,
       payload: await sealEnvelope(envelope, shared),
     });
   }
 
-  beginTransfer(to: string, cipherSize: number): void {
-    this.send({ type: "transfer_begin", to, size: cipherSize });
-  }
-
-  endTransfer(to: string, transferId: string, status: string): void {
-    this.send({ type: "transfer_end", to, transfer_id: transferId, status });
-  }
-
-  /** Shared secret with a peer, derived once and cached per session. */
   async sharedWith(peerId: string): Promise<Uint8Array> {
     const cached = this.sharedSecrets.get(peerId);
     if (cached) return cached;
     const peer = this.roster.get(peerId);
-    if (!peer) throw new Error("that peer is no longer in the room");
+    if (!peer) throw new Error("that peer is no longer nearby");
     const shared = await deriveSharedSecret(
       this.identity.privateKey,
       fromHex(peer.pubkey),
@@ -275,7 +251,10 @@ export class RelayClient {
     switch (frame.type) {
       case "created":
         this.selfId = frame.peer_id ?? "";
-        this.pendingIntent = { action: "join", code: frame.code };
+        this.confirmedRoom = frame.code ?? "";
+        this.socketRoom = this.confirmedRoom;
+        this.pendingIntent = null;
+        this.awaitingRoom = false;
         this.emit({
           type: "created",
           code: frame.code ?? "",
@@ -284,6 +263,14 @@ export class RelayClient {
         break;
 
       case "joined":
+        // The hello response precedes the room join during reconnect. Never
+        // publish its lobby scope while a room request is in flight.
+        if (!frame.code) this.lobbyPeerId = frame.peer_id ?? "";
+        if (!frame.code && this.awaitingRoom) break;
+        this.confirmedRoom = frame.code ?? "";
+        this.socketRoom = this.confirmedRoom;
+        this.pendingIntent = null;
+        this.awaitingRoom = false;
         this.selfId = frame.peer_id ?? "";
         this.emit({
           type: "joined",
@@ -293,64 +280,68 @@ export class RelayClient {
         break;
 
       case "roster": {
+        if (this.awaitingRoom) break;
         const peers = frame.peers ?? [];
-        // A peer that rejoins gets a new id and a new ephemeral key, so
-        // drop cached secrets for anyone no longer listed.
-        const present = new Set(peers.map((p) => p.id));
+        const present = new Set(peers.map((peer) => peer.id));
         for (const id of [...this.sharedSecrets.keys()]) {
           if (!present.has(id)) this.sharedSecrets.delete(id);
         }
-        this.roster = new Map(peers.map((p) => [p.id, p]));
+        this.roster = new Map(peers.map((peer) => [peer.id, peer]));
         this.emit({ type: "roster", peers });
         break;
       }
 
-      case "relay": {
+      case "signal": {
         const from = frame.from ?? "";
         if (!frame.payload) return;
         try {
           const shared = await this.sharedWith(from);
           const envelope = await openEnvelope(frame.payload, shared);
-          this.emit({ type: "envelope", from, envelope });
+          this.emit({ type: "signal", from, envelope });
         } catch (err) {
           this.emit({
             type: "error",
             code: "decrypt_failed",
-            message: `could not decrypt a message from a peer: ${describe(err)}`,
+            message: `could not decrypt WebRTC signaling: ${describe(err)}`,
           });
         }
         break;
       }
-
-      case "transfer_ready":
-        this.emit({
-          type: "transferReady",
-          transferId: frame.transfer_id ?? "",
-          token: frame.token ?? "",
-          role: frame.role === "sender" ? "sender" : "receiver",
-          peerId: frame.peer ?? "",
-          size: frame.size ?? 0,
-        });
-        break;
-
-      case "transfer_end":
-        this.emit({
-          type: "transferEnd",
-          transferId: frame.transfer_id ?? "",
-          status: frame.status ?? "",
-          from: frame.from ?? "",
-        });
-        break;
 
       case "peer_left":
         this.emit({ type: "peerLeft", peerId: frame.peer_id ?? "" });
         break;
 
       case "error":
+        if (
+          [
+            "no_room",
+            "network_mismatch",
+            "room_full",
+            "bad_request",
+            "already_in_room",
+            "capacity",
+            "rate_limited",
+          ].includes(frame.code_error ?? "")
+        ) {
+          this.pendingIntent = null;
+          this.awaitingRoom = false;
+          if (!this.socketRoom && this.lobbyPeerId) {
+            this.confirmedRoom = "";
+            this.selfId = this.lobbyPeerId;
+            this.emit({ type: "joined", code: "", peerId: this.selfId });
+          }
+          if (
+            frame.code_error === "no_room" ||
+            frame.code_error === "network_mismatch"
+          )
+            this.confirmedRoom = "";
+          this.sendHello(); // Refresh the current scope after ignoring in-flight rosters.
+        }
         this.emit({
           type: "error",
           code: frame.code_error ?? "unknown",
-          message: frame.message ?? "the relay reported an error",
+          message: frame.message ?? "the coordinator reported an error",
         });
         break;
 
