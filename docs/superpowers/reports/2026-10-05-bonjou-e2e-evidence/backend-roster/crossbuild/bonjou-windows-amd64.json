@@ -1,0 +1,19 @@
+{
+  "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+  "binary": "bonjou",
+  "goos": "windows",
+  "goarch": "amd64",
+  "command": [
+    "go",
+    "build",
+    "-trimpath",
+    "-o",
+    "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-windows-amd64.exe",
+    "./cmd/bonjou"
+  ],
+  "exit_code": 0,
+  "seconds": 0.25,
+  "sha256": "b9dc42b1d1efba9f83a6264af8bad48c8eef64756b164f5463fd6b6304bbd9d1",
+  "file": "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-windows-amd64.exe: PE32+ executable (console) x86-64, for MS Windows",
+  "runtime_executed": false
+}

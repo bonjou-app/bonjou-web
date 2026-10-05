@@ -1,12 +1,19 @@
 /** Real-browser transfer isolation, direct-link failure, and room reconnect regressions. */
 import { strict as assert } from "node:assert";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { chromium } from "playwright";
+import { createRtcDiagnostics } from "./rtc-diagnostics.mjs";
 
 const BASE = new URL(process.env.APP_URL ?? "http://127.0.0.1:4173").origin;
 const TIMEOUT = 30_000;
 const browsers = [];
 const errors = [];
 const payloadRequests = [];
+const diagnostics = createRtcDiagnostics({
+  output: join(process.env.E2E_REPORT_DIR ?? tmpdir(), "resilience-chromium"),
+  suite: "resilience",
+});
 
 // These hooks observe native browser objects and inject faults at their APIs.
 // They never access React state, replace protocol handlers, or alter ICE policy.
@@ -187,6 +194,7 @@ async function client(name) {
     reducedMotion: "reduce",
     viewport: { width: 1280, height: 850 },
   });
+  await diagnostics.observeContext(context, `client-${browsers.length}`);
   await context.addInitScript(installBrowserHarness, name);
   const page = await context.newPage();
   page.setDefaultTimeout(TIMEOUT);
@@ -541,6 +549,9 @@ try {
   console.log(
     "Resilience passed: simultaneous exact-byte downloads, same-peer transfer queue, direct mid-transfer loss on both peers, confirmed room reconnect without temporary lobby exposure.",
   );
+} catch (error) {
+  await diagnostics.captureFailure(error);
+  throw error;
 } finally {
   await Promise.all(browsers.map((browser) => browser.close()));
 }

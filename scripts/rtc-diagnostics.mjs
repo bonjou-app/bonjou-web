@@ -121,6 +121,27 @@ function installNativeRtcDiagnostics() {
       return "other";
     }
   };
+  const controlSendObservers = new WeakMap();
+  if (typeof RTCDataChannel === "function") {
+    observe(() => {
+      const prototype = RTCDataChannel.prototype;
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, "send");
+      if (typeof descriptor?.value !== "function") return;
+      Object.defineProperty(prototype, "send", {
+        ...descriptor,
+        value: new Proxy(descriptor.value, {
+          apply(target, receiver, args) {
+            // Do not shadow an instance's prototype. Later prototype fault
+            // injections must still run, and may call this saved original.
+            // Payload sends pass through without reading their arguments.
+            const result = Reflect.apply(target, receiver, args);
+            observe(() => controlSendObservers.get(receiver)?.(args[0]));
+            return result;
+          },
+        }),
+      });
+    });
+  }
   const observePeer = (peer) => {
     if (peers.length === 32) {
       omittedPeers += 1;
@@ -215,20 +236,7 @@ function installNativeRtcDiagnostics() {
         channel.addEventListener("message", (event) =>
           observe(() => countControl("received", event.data)),
         );
-        const nativeSend = channel.send;
-        Object.defineProperty(channel, "send", {
-          configurable: true,
-          writable: true,
-          value: new Proxy(nativeSend, {
-            apply(target, receiver, args) {
-              // Count only a successful native send, preserving its receiver,
-              // return value and any thrown error exactly as they were.
-              const result = Reflect.apply(target, receiver, args);
-              observe(() => countControl("sent", args[0]));
-              return result;
-            },
-          }),
-        });
+        controlSendObservers.set(channel, (data) => countControl("sent", data));
       }
     };
     peer.addEventListener("datachannel", ({ channel }) =>

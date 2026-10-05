@@ -1,0 +1,30 @@
+{
+  "command": "go test -race -count=1 -json ./...",
+  "baseline_head": "513c0eda8bccf9ba48d5f420a415711d7e9ba1aa",
+  "tested_source_sha256": {
+    "internal/relay/room.go": "2fabc1c531a4d20dfb0c2e496e12d9740e359de5cfd5b317f38873b08550633b",
+    "internal/relay/conn.go": "efd7e293688d50056b832ae1b0445573ca519950ef6f21823e55254cb6c513c4",
+    "internal/relay/room_test.go": "8e299717a18f990ac95eff738ddb1fa21398cfd416b4cf5900fc42e974d4f1ab"
+  },
+  "exit_code": 0,
+  "seconds": 5.0,
+  "passed_test_events": 163,
+  "passed_top_level_tests": 123,
+  "top_level_test_events": 124,
+  "skipped_tests": [
+    {
+      "package": "github.com/bonjou-app/bonjou-cli/internal/commands",
+      "test": "TestUnescapeShellPathLeavesWindowsSeparatorsAlone"
+    }
+  ],
+  "tested_packages": [
+    "github.com/bonjou-app/bonjou-cli/internal/relay",
+    "github.com/bonjou-app/bonjou-cli/internal/ui",
+    "github.com/bonjou-app/bonjou-cli/internal/queue",
+    "github.com/bonjou-app/bonjou-cli/internal/network",
+    "github.com/bonjou-app/bonjou-cli/internal/commands"
+  ],
+  "failures": [],
+  "log": "/tmp/bonjou-backend-roster-2026-10-05/race.jsonl",
+  "stderr": "/tmp/bonjou-backend-roster-2026-10-05/race.stderr.log"
+}

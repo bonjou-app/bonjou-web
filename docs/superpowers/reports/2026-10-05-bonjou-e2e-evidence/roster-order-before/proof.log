@@ -1,0 +1,7 @@
+=== RUN   TestRegressionNotifyRostersCannotOverwriteNewRosterWithOldSnapshot
+    roster_order_regression_test.go:36: enqueue order: first roster=[{ID:alice PubKey: Source:network}], final roster=[]
+    roster_order_regression_test.go:39: older NotifyRosters snapshot overwrote the current live member
+--- FAIL: TestRegressionNotifyRostersCannotOverwriteNewRosterWithOldSnapshot (0.00s)
+FAIL
+FAIL	github.com/bonjou-app/bonjou-cli/internal/relay	0.888s
+FAIL

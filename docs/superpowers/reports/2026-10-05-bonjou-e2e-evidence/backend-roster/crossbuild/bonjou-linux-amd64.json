@@ -1,0 +1,19 @@
+{
+  "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+  "binary": "bonjou",
+  "goos": "linux",
+  "goarch": "amd64",
+  "command": [
+    "go",
+    "build",
+    "-trimpath",
+    "-o",
+    "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-linux-amd64",
+    "./cmd/bonjou"
+  ],
+  "exit_code": 0,
+  "seconds": 0.69,
+  "sha256": "7bb3fffe5a3bfdb114d7968e75ae76537ad05777c2d69829803ad1d1bd0110fd",
+  "file": "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-linux-amd64: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, Go BuildID=ozNpyk5Uc_R6UV19g5-y/Noe94ULtxEjlno7IvXvd/bHN2qKbUSLsBs70pcLEA/0WqV1aBixIOL8MkBhQIT, BuildID[sha1]=074c0033009f293db900901e496e2881acc276fc, with debug_info, not stripped",
+  "runtime_executed": false
+}

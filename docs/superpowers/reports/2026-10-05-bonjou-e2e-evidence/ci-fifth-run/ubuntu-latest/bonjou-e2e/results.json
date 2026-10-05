@@ -1,0 +1,61 @@
+{
+  "origin": "http://127.0.0.1:4173",
+  "results": [
+    {
+      "name": "ui-chromium",
+      "logFile": "ui-chromium-1.log",
+      "started": "2026-10-05T06:47:52.122Z",
+      "durationSeconds": 16.83,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "motion-chromium",
+      "logFile": "motion-chromium-1.log",
+      "started": "2026-10-05T06:48:08.951Z",
+      "durationSeconds": 11.85,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-chromium",
+      "logFile": "lan-chromium-1.log",
+      "started": "2026-10-05T06:48:20.798Z",
+      "durationSeconds": 10.24,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "experience-chromium",
+      "logFile": "experience-chromium-1.log",
+      "started": "2026-10-05T06:48:31.040Z",
+      "durationSeconds": 15.98,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "workflows-chromium",
+      "logFile": "workflows-chromium-1.log",
+      "started": "2026-10-05T06:48:47.024Z",
+      "durationSeconds": 32.93,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "accessibility-chromium",
+      "logFile": "accessibility-chromium-1.log",
+      "started": "2026-10-05T06:49:19.952Z",
+      "durationSeconds": 15.29,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "polish-chromium",
+      "logFile": "polish-chromium-1.log",
+      "started": "2026-10-05T06:49:35.246Z",
+      "durationSeconds": 34.4,
+      "code": 1,
+      "signal": null
+    }
+  ]
+}

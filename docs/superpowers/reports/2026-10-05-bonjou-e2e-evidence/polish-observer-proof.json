@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "suite": "native Chrome polish",
+  "beforeEvidence": "/tmp/bonjou-observer-polish-uHs12s/before/01-light-client-1-1-failure.json",
+  "afterEvidence": "/tmp/bonjou-observer-polish-uHs12s/after",
+  "log": "/tmp/bonjou-observer-polish-uHs12s/run.log",
+  "fix": "Shared RTCDataChannel.prototype.send Proxy with WeakMap control observers; no own channel.send property",
+  "verified": "Existing light/dark prototype fault injection counts exactly one failed send, preserves draft, blocks delivery before restored native retry; all suite assertions pass",
+  "validation": "Polish passed: populated light/dark 320/390/1440px and 200% desktop reflow equivalent, long names/messages/filenames, 16 axe scans, keyboard focus traps and returns including rooms, associated room errors/format hints/retained input, 44px room/Verify/name controls, offer-details/footer bounds, deferred and multiple approvals/navigation/exact downloads, unread visibility, injected failed-chat draft recovery. Screenshots: /tmp/bonjou-observer-polish-uHs12s/after",
+  "productionSourceChanges": false,
+  "browserProcessesClosed": true
+}

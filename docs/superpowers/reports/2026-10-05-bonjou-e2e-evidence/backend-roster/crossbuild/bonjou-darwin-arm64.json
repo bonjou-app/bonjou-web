@@ -1,0 +1,19 @@
+{
+  "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+  "binary": "bonjou",
+  "goos": "darwin",
+  "goarch": "arm64",
+  "command": [
+    "go",
+    "build",
+    "-trimpath",
+    "-o",
+    "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-darwin-arm64",
+    "./cmd/bonjou"
+  ],
+  "exit_code": 0,
+  "seconds": 0.31,
+  "sha256": "0a9b6b4731e207f6074a276f09be2923e39138f7050688b4acf2a2c36fb73a88",
+  "file": "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-darwin-arm64: Mach-O 64-bit executable arm64",
+  "runtime_executed": false
+}

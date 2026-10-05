@@ -1,0 +1,8 @@
+=== RUN   TestScheduledRosterSnapshotCannotOvertakeMembership
+    roster_delivery_scheduling_test.go:56: fixed enqueue order: first=[], last=[{ID:alice PubKey: Source:network}]
+--- PASS: TestScheduledRosterSnapshotCannotOvertakeMembership (0.00s)
+=== RUN   TestScheduledDepartureCannotOvertakeCodeRoomMembership
+    roster_delivery_scheduling_test.go:127: fixed enqueue order: peer_left, roster peers=[], roster peers=[{ID:alice PubKey: Source:code}]
+--- PASS: TestScheduledDepartureCannotOvertakeCodeRoomMembership (0.00s)
+PASS
+ok  	github.com/bonjou-app/bonjou-cli/internal/relay	2.055s

@@ -1,7 +1,7 @@
 # Bonjou comprehensive verification
 
 Date: 2026-10-05. Canonical web candidate based on `59e2f8a7fd3a`; canonical
-coordinator code tested at `df923b6d5440b037212c2dbb3a08456d46e1c488`.
+coordinator code tested at `0e30775c9efeded215930ab46aaffaa65a8c85ea`.
 
 ## Result and repository integration
 
@@ -38,10 +38,13 @@ directory. Suites ran sequentially against the production preview at
 `http://127.0.0.1:4173`, configured for the local signaling coordinator at
 `http://127.0.0.1:46330`. Independent browsers use native WebRTC and crypto;
 no ICE, mDNS, protocol framing, or production timeout was changed to pass tests.
-The final lifecycle fixes were followed by all 17 checks again, with every
-check passing against the updated coordinator. [Final sequential results and
-logs](2026-10-05-bonjou-e2e-evidence/lifecycle-final/results.json) record that run.
-The fresh PR CI suite exercises the complete committed tree.
+The connection lifecycle fixes were followed by all 17 checks again, passing
+against coordinator `df923b6`. [That full sequential run](2026-10-05-bonjou-e2e-evidence/lifecycle-final/results.json)
+is retained. After the final roster/departure corrections at `0e30775`, all
+eight affected sharing/coordinator checks passed again, including Chrome and
+WebKit LAN, mixed-engine transfers, workflows, polish, resilience, staging, and
+coordinator smoke. [Final targeted results and logs](2026-10-05-bonjou-e2e-evidence/roster-final/results.json)
+record that run. The fresh PR CI suite exercises the complete committed tree.
 
 | Check                         | Local result and demonstrated behavior                                                                                                                                                                                                                                                                                                                                                                |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -59,7 +62,7 @@ The fresh PR CI suite exercises the complete committed tree.
 | Mixed Chrome ↔ WebKit         | Bidirectional chat, matching independently checked fingerprints, approval before reads/downloads, SHA-256 and exact downloads, declines both ways, no HTTP payload writes, departure preserves private drafts/staging and disables departed targets.                                                                                                                                                  |
 | Boundaries: Chrome and WebKit | Genuine 0-byte/2 MiB native lab downloads; receiver-corruption rejection and clean retry; unchanged 20-second deadline and retry; unmount closes peer connections/channels and revokes Blob URLs; all ten artwork variants decode; system/manual/persisted theme; navigation resizing. Real single/multiline clipboard round-trips run in Chrome; WebKit grant is unsupported and explicitly skipped. |
 | Coordinator smoke             | Health, network-scoped rooms, roster without profile names, equal derived signaling keys, opaque encrypted signaling preserved, legacy payload frames rejected, HTTP payload route returns 404.                                                                                                                                                                                                       |
-| Go race/vet/lint/format       | Fresh uncached race suite: 119 top-level passes across five packages, one Windows-only skip on macOS; vet and golangci-lint pass; all 63 tracked Go files formatted. [Raw logs and count summary](2026-10-05-bonjou-e2e-evidence/backend-lifecycle/summary.json).                                                                                                                                     |
+| Go race/vet/lint/format       | Fresh uncached race suite: 123 top-level passes across five packages, one Windows-only skip on macOS; vet and golangci-lint pass; all 63 tracked Go files formatted. [Raw logs and count summary](2026-10-05-bonjou-e2e-evidence/backend-roster/summary.json).                                                                                                                                        |
 | Cross-builds                  | CLI Linux amd64/arm64, macOS arm64, Windows amd64; coordinator Linux amd64/arm64 compile. Local cross-builds do not establish runtime behavior. GitHub CI runs Go tests on Linux, macOS, and Windows.                                                                                                                                                                                                 |
 
 ## Findings and corrections
@@ -162,6 +165,47 @@ The fresh PR CI suite exercises the complete committed tree.
     two-browser exchange confirms one sent/received profile per client and
     excludes names, message bodies, keys, SDP, and raw addresses from the
     [observer proof](2026-10-05-bonjou-e2e-evidence/rtc-control-observer-proof.json).
+
+13. Run [37274107969](https://github.com/bonjou-app/bonjou-web/actions/runs/37274107969)
+    again passed every macOS check. Linux passed native LAN and workflows, then
+    failed initial peer discovery in the dark-theme polish check after light
+    polish had completed. Alice displayed Bob; Bob did not display Alice.
+    [Retained results](2026-10-05-bonjou-e2e-evidence/ci-fifth-run) include the
+    timeout. Polish now captures passive RTC/profile counters before closing
+    its failed clients. No native state was captured by that older attempt,
+    so its precise cause is not asserted.
+
+14. The new send observer initially shadowed the prototype method used by the
+    polish test's existing failed-chat injection. The local observer check
+    exposed this harness failure. Observation now uses one prototype proxy and
+    a WeakMap of control-channel counters, preserving later prototype patches
+    and exact native returns/errors. Both themes again prove failed-send draft
+    retention and a genuine successful retry, alongside all original polish
+    checks. [Harness before/after proof](2026-10-05-bonjou-e2e-evidence/polish-observer-proof.json)
+    records the correction. Polish fixture seeding now runs only at the app's
+    origin, avoiding storage exceptions in opaque initial/download documents.
+
+15. A separate scheduling proof found old roster snapshots could be enqueued
+    after newer membership snapshots, making a browser discard a present peer.
+    A test-only barrier in an isolated checkout reproduces the actual old
+    `NotifyRosters` path and observes `[Alice]` followed by `[]` at Bob.
+    [Before-fix proof](2026-10-05-bonjou-e2e-evidence/roster-order-before/summary.json)
+    establishes this ordering defect; it does not identify the fifth run's
+    precise cause. The final coordinator serializes snapshot and queue delivery
+    with membership changes, including repeat-hello refreshes.
+
+16. The same scheduling review reproduced a delayed lobby `peer_left` arriving
+    after a recipient moved into a private room with that peer. Departure now
+    removes membership, selects current recipients, and queues notices and
+    correcting rosters under one Hub write lock. A peer still reachable through
+    another current room receives the current roster without a false departure.
+    Both isolated ordering reproductions fail before the fix and pass afterward.
+    Four additional regressions bring the race suite to 123 top-level passes
+    (163 including subtests), with one Windows-only skip on macOS.
+    [Exact scheduling proofs and final race/vet/lint/format evidence](2026-10-05-bonjou-e2e-evidence/backend-roster/summary.json)
+    record the result. Retained browser profiles now refresh their source label
+    from the current candidate while preserving name, key, link, and transfer
+    state, so a retained private-room peer is labeled correctly.
 
 ## Current captures
 

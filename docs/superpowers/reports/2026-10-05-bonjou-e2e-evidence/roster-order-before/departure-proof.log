@@ -1,0 +1,7 @@
+=== RUN   TestRegressionLateLobbyDepartureCannotDropCurrentCodeRoomPeer
+    roster_order_regression_test.go:79: enqueue order: roster with peers=[{ID:alice PubKey: Source:code}], then peer_left for peer=alice
+    roster_order_regression_test.go:80: late former-lobby peer_left drops a currently reachable code-room peer without a corrective roster
+--- FAIL: TestRegressionLateLobbyDepartureCannotDropCurrentCodeRoomPeer (0.00s)
+FAIL
+FAIL	github.com/bonjou-app/bonjou-cli/internal/relay	1.278s
+FAIL

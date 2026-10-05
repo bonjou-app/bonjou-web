@@ -732,8 +732,14 @@ export function useSession(name: string, active: boolean) {
     );
     setCandidateCount(allowed.length);
     const ids = new Set(allowed.map((candidate) => candidate.id));
-    for (const id of [...profilesRef.current.keys()]) {
-      if (!ids.has(id)) profilesRef.current.delete(id);
+    for (const [id, profile] of profilesRef.current) {
+      if (!ids.has(id)) {
+        profilesRef.current.delete(id);
+        continue;
+      }
+      const source = candidatesRef.current.get(id)?.source;
+      if (source && profile.source !== source)
+        profilesRef.current.set(id, { ...profile, source });
     }
     linksRef.current?.retain([...ids]);
     linksRef.current?.discover([...ids]);

@@ -1,0 +1,5 @@
+var beforeRosterEnqueueForTest func(*Peer, *serverMessage)
+
+func (p *Peer) Send(msg *serverMessage) {
+	if beforeRosterEnqueueForTest != nil { beforeRosterEnqueueForTest(p, msg) }
+

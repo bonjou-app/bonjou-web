@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { createRtcDiagnostics } from "./rtc-diagnostics.mjs";
 
 const BASE = process.env.APP_URL ?? "http://127.0.0.1:4173";
 const OUTPUT =
@@ -20,6 +21,7 @@ const OUTPUT =
 const browsers = [];
 const errors = [];
 const checked = [];
+const diagnostics = createRtcDiagnostics({ output: OUTPUT, suite: "polish" });
 
 async function client(name, theme) {
   const browser = await chromium.launch({
@@ -32,12 +34,17 @@ async function client(name, theme) {
     reducedMotion: "reduce",
     viewport: { width: 1440, height: 900 },
   });
+  await diagnostics.observeContext(
+    context,
+    `${theme}-client-${browsers.length}`,
+  );
   await context.addInitScript(
-    ({ name, theme }) => {
+    ({ name, theme, origin }) => {
+      if (location.origin !== origin) return;
       localStorage.setItem("bonjou.name", name);
       localStorage.setItem("bonjou.theme", theme);
     },
-    { name, theme },
+    { name, theme, origin: new URL(BASE).origin },
   );
   const page = await context.newPage();
   page.on("pageerror", (error) => errors.push(error.message));
@@ -700,6 +707,9 @@ try {
     const firstBrowser = browsers.length;
     try {
       await checkTheme(theme);
+    } catch (error) {
+      await diagnostics.captureFailure(error);
+      throw error;
     } finally {
       await Promise.all(
         browsers.slice(firstBrowser).map((browser) => browser.close()),

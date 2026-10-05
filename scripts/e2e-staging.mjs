@@ -5,10 +5,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "playwright";
+import { createRtcDiagnostics } from "./rtc-diagnostics.mjs";
 
 const BASE = process.env.APP_URL ?? "http://127.0.0.1:4173";
 const browsers = [];
 const errors = [];
+const diagnostics = createRtcDiagnostics({
+  output: join(process.env.E2E_REPORT_DIR ?? tmpdir(), "staging-chromium"),
+  suite: "staging",
+});
 const directory = await mkdtemp(join(tmpdir(), "bonjou-staging-"));
 const pasteKey = process.platform === "darwin" ? "Meta+V" : "Control+V";
 
@@ -24,6 +29,7 @@ async function client(name) {
     viewport: { width: 1280, height: 850 },
     permissions: ["clipboard-read", "clipboard-write"],
   });
+  await diagnostics.observeContext(context, `client-${browsers.length}`);
   await context.addInitScript((name) => {
     localStorage.setItem("bonjou.name", name);
     localStorage.setItem("bonjou.theme", "light");
@@ -592,6 +598,9 @@ try {
   console.log(
     "Staging passed: local remove/clear Undo and focus repair without payload reads, Undo expiry, text/image clipboard paste, private-recipient departure retains draft and staged files without broadcasting, explicit recipient recovery, named broadcast audience, home/Received persistence, failed metadata retention and retry, approval and exact bytes, Undo preserves late-drop invalidation, folders, bounded mobile metadata, short-window actions, and axe.",
   );
+} catch (error) {
+  await diagnostics.captureFailure(error);
+  throw error;
 } finally {
   await Promise.all(browsers.map((browser) => browser.close()));
   await rm(directory, { recursive: true, force: true });
