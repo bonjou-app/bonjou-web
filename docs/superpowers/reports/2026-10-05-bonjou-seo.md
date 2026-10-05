@@ -8,6 +8,7 @@ Google Chrome was used to search Google for “Google Search Central SEO starter
 - The introductory paragraph explicitly describes local file, folder and message sharing. Four primary workspace CTAs are real links with normal modified/new-tab behavior and preserved session-aware navigation for plain clicks.
 - The homepage has an absolute canonical URL, a useful description, WebSite JSON-LD with its short name and Bonjou alternate name, and Open Graph/Twitter previews using the approved logo. Workspace metadata never includes room codes, names or session values.
 - A separate application shell and HTTP/meta `noindex` cover `/app`, `/share`, `/r/{code}`, the shell itself and legacy `/?r=...` invitations. Crawling stays allowed so search engines can read those instructions. Client navigation removes public canonical/schema metadata in the workspace and restores it on return home.
+- Protected Vercel preview verification caught filesystem precedence for legacy root invitations. Those links now use a temporary redirect to `/app`, retaining their original room query, before loading the private shell.
 - `robots.txt` advertises a sitemap containing the canonical public homepage. Decorative artwork retains its correct empty alt text; existing responsive WebP assets, dimensions, lazy loading and font preload remain.
 
 ## Verification
@@ -29,4 +30,5 @@ Fresh hosted browser checks and deployed-preview checks are required before merg
 - [Google robots meta and HTTP headers](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag): noindex and the need to allow crawling of its response. Read in Chrome.
 - [Google site names](https://developers.google.com/search/docs/appearance/site-names): truthful homepage WebSite structured data.
 - [Vite SSR](https://vite.dev/guide/ssr.html): built-in module loading and framework rendering APIs.
-- [Vercel configuration](https://vercel.com/docs/project-configuration/vercel-json): query-aware rewrites and response headers.
+- [Vercel configuration](https://vercel.com/docs/project-configuration/vercel-json): query-aware redirects, rewrites and response headers.
+- [Vercel redirects](https://vercel.com/docs/routing/redirects): original query parameters pass through unless explicitly replaced.

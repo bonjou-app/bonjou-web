@@ -81,7 +81,9 @@ for (const route of ["/app", "/share", "/r/:code"]) {
   assert.ok(config.rewrites.some((rule) => rule.source === route && rule.destination === "/app-shell.html"), `Missing private rewrite: ${route}`);
   assert.ok(config.headers.some((rule) => rule.source === route && noindex(rule)), `Missing noindex header: ${route}`);
 }
-assert.ok(config.rewrites.some((rule) => hasRoomQuery(rule) && rule.destination === "/app-shell.html"));
+// Vercel checks files before rewrites: legacy root invites need a redirect
+// before filesystem handling. The original query is retained for the app.
+assert.ok(config.redirects.some((rule) => hasRoomQuery(rule) && rule.destination === "/app" && rule.permanent === false));
 assert.ok(config.headers.some((rule) => hasRoomQuery(rule) && noindex(rule)));
 assert.ok(config.headers.some((rule) => rule.source === "/app-shell.html" && noindex(rule)));
 console.log("SEO build verification passed: public content, private indexing, metadata, sitemap, and social image");
