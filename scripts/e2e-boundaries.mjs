@@ -308,7 +308,7 @@ async function decodeArtwork(page, locator, kind) {
 async function openAppAndReturn(page, urls, countBefore) {
   await page
     .locator(".masthead")
-    .getByRole("button", { name: "Open Bonjou", exact: true })
+    .getByRole("link", { name: "Open Bonjou", exact: true })
     .click();
   await page.getByLabel("Your display name").waitFor();
   assert.equal(
@@ -581,7 +581,7 @@ try {
     async (page) => {
       await page
         .locator(".masthead")
-        .getByRole("button", { name: "Open Bonjou", exact: true })
+        .getByRole("link", { name: "Open Bonjou", exact: true })
         .click();
       await page
         .getByText("Connected", { exact: true })

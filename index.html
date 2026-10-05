@@ -24,11 +24,8 @@
       content="#0a0e16"
       media="(prefers-color-scheme: dark)"
     />
-    <title>bonjou-web: send files to anyone on your Wi-Fi</title>
-    <meta
-      name="description"
-      content="Send messages, files, and folders directly to people on the same Wi-Fi. No payload server, no remote fallback, and no account needed."
-    />
+    <title>bonjou-web</title>
+    <!--seo-metadata-->
     <meta name="color-scheme" content="light dark" />
     <link
       rel="preload"
@@ -60,11 +57,13 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
     <noscript>
-      Bonjou's web transfer needs JavaScript: files are encrypted in your
-      browser before they are sent.
+      <p style="margin: 1rem; padding: 1rem; border: 1px solid currentColor">
+        Browser sharing needs JavaScript to connect devices and encrypt files.
+        You can still read about Bonjou and find the CLI install guide below.
+      </p>
     </noscript>
+    <div id="root"><!--landing-html--></div>
     <script type="module" src="/src/share/main.tsx"></script>
   </body>
 </html>

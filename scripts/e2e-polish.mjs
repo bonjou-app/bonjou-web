@@ -574,7 +574,7 @@ async function checkTheme(theme) {
   await bob.getByRole("heading", { level: 1 }).waitFor();
   await send(alice, `${theme}: unread while the marketing page is open`);
   await unread(bob, aliceName, 2);
-  await bob.getByRole("button", { name: "Start sharing", exact: true }).click();
+  await bob.getByRole("link", { name: "Start sharing", exact: true }).click();
   await peer(bob, aliceName).waitFor();
   await unread(bob, aliceName, 2);
   await bob

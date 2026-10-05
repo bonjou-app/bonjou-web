@@ -8,15 +8,12 @@ import {
 } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Landing } from "./Landing";
+import { applyMetadata, isApplicationUrl } from "./seo";
 import { useTheme } from "./theme";
 
 const ShareApp = lazy(() => import("./ShareApp"));
 function isApp() {
-  return (
-    /^\/(app|share)(\/|$)/.test(location.pathname) ||
-    location.pathname.startsWith("/r/") ||
-    Boolean(new URLSearchParams(location.search).get("r"))
-  );
+  return isApplicationUrl(location.pathname, location.search);
 }
 
 export default function App() {
@@ -27,6 +24,9 @@ export default function App() {
     isApp() ? location.pathname + location.search : "/app",
   );
   const theme = useTheme();
+  useEffect(() => {
+    applyMetadata(visible);
+  }, [visible]);
   const rememberAppPath = useCallback((path: string) => {
     appPath.current = path;
   }, []);

@@ -1,0 +1,64 @@
+[
+  {
+    "path": "/",
+    "status": 200,
+    "title": "bonjou-web",
+    "robots": "index, follow, max-image-preview:large",
+    "header": null,
+    "canonical": [
+      "https://bonjou.vercel.app/"
+    ],
+    "rawHtmlHeadingCount": 1,
+    "htmlBytes": 96387
+  },
+  {
+    "path": "/app",
+    "status": 200,
+    "title": "bonjou-web",
+    "robots": "noindex, follow",
+    "header": "noindex, follow",
+    "canonical": [],
+    "rawHtmlHeadingCount": 0,
+    "htmlBytes": 3936
+  },
+  {
+    "path": "/share",
+    "status": 200,
+    "title": "bonjou-web",
+    "robots": "noindex, follow",
+    "header": "noindex, follow",
+    "canonical": [],
+    "rawHtmlHeadingCount": 0,
+    "htmlBytes": 3936
+  },
+  {
+    "path": "/r/SEO123",
+    "status": 200,
+    "title": "bonjou-web",
+    "robots": "noindex, follow",
+    "header": "noindex, follow",
+    "canonical": [],
+    "rawHtmlHeadingCount": 0,
+    "htmlBytes": 3936
+  },
+  {
+    "path": "/?r=SEO123",
+    "status": 200,
+    "title": "bonjou-web",
+    "robots": "noindex, follow",
+    "header": "noindex, follow",
+    "canonical": [],
+    "rawHtmlHeadingCount": 0,
+    "htmlBytes": 3936
+  },
+  {
+    "path": "/app-shell.html",
+    "status": 200,
+    "title": "bonjou-web",
+    "robots": "noindex, follow",
+    "header": "noindex, follow",
+    "canonical": [],
+    "rawHtmlHeadingCount": 0,
+    "htmlBytes": 3936
+  }
+]
