@@ -184,6 +184,22 @@
       "durationSeconds": 0.23,
       "code": 0,
       "signal": null
+    },
+    {
+      "name": "lan-chromium",
+      "logFile": "lan-chromium-2.log",
+      "started": "2026-10-05T05:53:45.960Z",
+      "durationSeconds": 14.51,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-webkit",
+      "logFile": "lan-webkit-2.log",
+      "started": "2026-10-05T05:54:00.475Z",
+      "durationSeconds": 12.03,
+      "code": 0,
+      "signal": null
     }
   ]
 }

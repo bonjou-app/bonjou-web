@@ -12,7 +12,11 @@ signaling coordinator belongs in
 [bonjou-cli PR 20](https://github.com/bonjou-app/bonjou-cli/pull/20).
 Fresh CI on both PR heads is a merge gate; earlier green checks are not reused
 as verification of this candidate. CI runs the complete sequential browser
-suite and saves its logs and captures as a `browser-verification` artifact.
+suite and saves its logs and captures as `browser-verification-ubuntu-latest` and
+`browser-verification-macos-latest` artifacts. Chrome native transfer suites run
+on Linux; WebKit native transfer and mixed-engine suites run on macOS. Linux
+also retains WebKit UI and motion checks. All 17 named checks remain required
+across the two jobs, with three additional repeated platform checks.
 
 The approved split remains intact: no `website/` is restored to CLI main.
 The old combined checkout and all task changes are preserved in local branch
@@ -73,6 +77,22 @@ engines. The fresh PR CI suite exercises the complete committed tree.
    that state when entering desktop. Both browsers pass the regression.
 6. Boundary screenshots are saved per suite/engine and CI uploads failure
    evidence even when a suite stops the sequence.
+
+7. The first Linux CI run ([37268875126](https://github.com/bonjou-app/bonjou-web/actions/runs/37268875126))
+   passed all nine Chrome suites and WebKit UI/motion, then timed out waiting for
+   Bob during native WebKit peer discovery. Both clients had connected to the
+   coordinator. [Its retained result/log](2026-10-05-bonjou-e2e-evidence/ci-linux-initial/results.json)
+   does not establish the underlying cause. Playwright's
+   [native-port guidance](https://playwright.dev/docs/browsers#webkit)
+   recommends macOS for the closest Safari behavior; its
+   [launcher](https://github.com/microsoft/playwright/blob/v1.63.0/browser_patches/webkit/pw_run.sh)
+   uses different Linux and macOS ports. Native WebKit and mixed-browser transfer
+   checks are now required on macOS, while Chrome flows and WebKit UI/motion
+   remain on Linux. A read-only preflight records each port's actual WebRTC and
+   WebCrypto availability; required transfer engines fail clearly when absent.
+   LAN failures save peer/ICE/signaling states, browser errors, and captures.
+   No transport setting or timeout was relaxed. The added observer and preflight
+   pass locally, and both Chrome/WebKit LAN flows pass after the change.
 
 ## Current captures
 

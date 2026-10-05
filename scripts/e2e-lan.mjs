@@ -1,18 +1,35 @@
 /** Real-browser LAN-only chat, room isolation, approval, and file smoke test. */
 
 import { strict as assert } from "node:assert";
+import { mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { chromium, webkit } from "playwright";
 const webkitRun = process.env.PLAYWRIGHT_ENGINE === "webkit";
 const browserType = webkitRun ? webkit : chromium;
 
-const APP = new URL("/app", process.env.APP_URL ?? "http://127.0.0.1:4173").href;
+const APP = new URL("/app", process.env.APP_URL ?? "http://127.0.0.1:4173")
+  .href;
 const BROWSER_CHANNEL = process.env.PLAYWRIGHT_CHANNEL ?? "chrome";
+const OUTPUT = process.env.LAN_SCREENSHOTS ?? join(tmpdir(), "bonjou-lan");
+await mkdir(OUTPUT, { recursive: true });
 
 async function contextFor(browser, name) {
   const context = await browser.newContext({ acceptDownloads: true });
   await context.addInitScript((value) => {
     localStorage.setItem("bonjou.name", value);
+    window.__lanPeers = [];
+    if (typeof RTCPeerConnection !== "undefined") {
+      const native = RTCPeerConnection;
+      window.RTCPeerConnection = new Proxy(native, {
+        construct(target, args) {
+          const peer = Reflect.construct(target, args, target);
+          window.__lanPeers.push(peer);
+          return peer;
+        },
+      });
+    }
   }, name);
   const page = await context.newPage();
   const errors = [];
@@ -27,10 +44,14 @@ async function contextFor(browser, name) {
     }
   });
   await page.goto(APP, { waitUntil: "networkidle" });
+  assert(
+    await page.evaluate(() => typeof RTCPeerConnection === "function"),
+    "This browser port lacks native WebRTC; transfer verification requires a supported port",
+  );
   await page
     .getByText("Connected", { exact: true })
     .waitFor({ timeout: 15_000 });
-  return { context, page, errors, payloadRequests };
+  return { name, context, page, errors, payloadRequests };
 }
 
 async function readDownload(download) {
@@ -148,7 +169,7 @@ async function main() {
     await alice.page.getByRole("button", { name: /^Offer files to / }).click();
     await bob.page.getByText("direct-proof.txt", { exact: true }).waitFor();
     await bob.page.screenshot({
-      path: "/tmp/bonjou-file-approval-desktop.png",
+      path: join(OUTPUT, "file-approval-desktop.png"),
     });
     const downloadPromise = bob.page.waitForEvent("download", {
       timeout: 30_000,
@@ -201,7 +222,9 @@ async function main() {
       "mobile approval is clipped vertically",
     );
     assert.equal(mobileDownloads, 0, "download started before approval");
-    await bob.page.screenshot({ path: "/tmp/bonjou-file-approval-mobile.png" });
+    await bob.page.screenshot({
+      path: join(OUTPUT, "file-approval-mobile.png"),
+    });
     const mobileDownloadPromise = bob.page.waitForEvent("download");
     await drawer
       .getByRole("button", { name: "Approve and download", exact: true })
@@ -231,7 +254,7 @@ async function main() {
     assert.equal(mobileDownloads, 1, "declined offer created a download");
 
     await alice.page.screenshot({
-      path: "/tmp/bonjou-lan-e2e.png",
+      path: join(OUTPUT, "lan-e2e.png"),
       fullPage: true,
     });
     for (const client of clients) {
@@ -250,6 +273,32 @@ async function main() {
     console.log(
       `LAN E2E passed: discovery, chat, room ${roomCode}, isolation, desktop/mobile approval, decline, exact bytes`,
     );
+  } catch (error) {
+    for (const client of clients) {
+      const state = await client.page
+        .evaluate(() => ({
+          peerConnection: typeof RTCPeerConnection,
+          peers: window.__lanPeers.map((peer) => ({
+            connection: peer.connectionState,
+            ice: peer.iceConnectionState,
+            gathering: peer.iceGatheringState,
+            signaling: peer.signalingState,
+          })),
+        }))
+        .catch(() => ({ unavailable: true }));
+      await writeFile(
+        join(OUTPUT, `${client.name}-failure.json`),
+        JSON.stringify({ ...state, errors: client.errors }, null, 2),
+      );
+      await client.page
+        .screenshot({
+          path: join(OUTPUT, `${client.name}-failure.png`),
+          fullPage: true,
+        })
+        .catch(() => {});
+      console.error(`${client.name} runtime: ${JSON.stringify(state)}`);
+    }
+    throw error;
   } finally {
     for (const client of clients) await client.context.close();
     await Promise.all(browsers.map((browser) => browser.close()));

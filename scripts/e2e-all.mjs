@@ -50,6 +50,7 @@ for (const [suite, engine] of checks) {
     POLISH_SCREENSHOTS: join(output, name),
     EXPERIENCE_SCREENSHOTS: join(output, name),
     BOUNDARIES_SCREENSHOTS: join(output, name),
+    LAN_SCREENSHOTS: join(output, name),
   };
   const script =
     suite === "smoke"

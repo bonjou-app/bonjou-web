@@ -1,0 +1,101 @@
+{
+  "origin": "http://127.0.0.1:4173",
+  "results": [
+    {
+      "name": "ui-chromium",
+      "logFile": "ui-chromium-1.log",
+      "started": "2026-10-05T05:43:07.581Z",
+      "durationSeconds": 16.91,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "motion-chromium",
+      "logFile": "motion-chromium-1.log",
+      "started": "2026-10-05T05:43:24.495Z",
+      "durationSeconds": 11.81,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-chromium",
+      "logFile": "lan-chromium-1.log",
+      "started": "2026-10-05T05:43:36.306Z",
+      "durationSeconds": 10.39,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "experience-chromium",
+      "logFile": "experience-chromium-1.log",
+      "started": "2026-10-05T05:43:46.700Z",
+      "durationSeconds": 16.58,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "workflows-chromium",
+      "logFile": "workflows-chromium-1.log",
+      "started": "2026-10-05T05:44:03.280Z",
+      "durationSeconds": 33.3,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "accessibility-chromium",
+      "logFile": "accessibility-chromium-1.log",
+      "started": "2026-10-05T05:44:36.583Z",
+      "durationSeconds": 14.74,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "polish-chromium",
+      "logFile": "polish-chromium-1.log",
+      "started": "2026-10-05T05:44:51.327Z",
+      "durationSeconds": 22.78,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "resilience-chromium",
+      "logFile": "resilience-chromium-1.log",
+      "started": "2026-10-05T05:45:14.104Z",
+      "durationSeconds": 7.51,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "staging-chromium",
+      "logFile": "staging-chromium-1.log",
+      "started": "2026-10-05T05:45:21.617Z",
+      "durationSeconds": 10.71,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "ui-webkit",
+      "logFile": "ui-webkit-1.log",
+      "started": "2026-10-05T05:45:32.328Z",
+      "durationSeconds": 61.29,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "motion-webkit",
+      "logFile": "motion-webkit-1.log",
+      "started": "2026-10-05T05:46:33.622Z",
+      "durationSeconds": 14.99,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-webkit",
+      "logFile": "lan-webkit-1.log",
+      "started": "2026-10-05T05:46:48.612Z",
+      "durationSeconds": 23.01,
+      "code": 1,
+      "signal": null
+    }
+  ]
+}

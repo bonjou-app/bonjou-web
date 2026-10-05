@@ -26,9 +26,19 @@ jobs:
       - run: npm run build
 
   end-to-end:
-    name: End-to-end browsers
-    runs-on: ubuntu-latest
+    name: End-to-end browsers (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rtc-engines: chromium
+            suites: ui-chromium,motion-chromium,lan-chromium,experience-chromium,workflows-chromium,accessibility-chromium,polish-chromium,resilience-chromium,staging-chromium,ui-webkit,motion-webkit,boundaries-chromium,smoke-coordinator
+          - os: macos-latest
+            rtc-engines: chromium,webkit
+            suites: ui-webkit,motion-webkit,lan-webkit,experience-webkit,cross-browser-mixed,boundaries-webkit,smoke-coordinator
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,6 +63,9 @@ jobs:
           VITE_COORDINATOR_URL: http://127.0.0.1:46330
       - name: Verify complete browser journeys
         shell: bash
+        env:
+          E2E_SUITES: ${{ matrix.suites }}
+          E2E_RTC_ENGINES: ${{ matrix.rtc-engines }}
         run: |
           set -euo pipefail
           go build -C .e2e-cli -o "$RUNNER_TEMP/bonjou-coordinator" ./cmd/bonjou-relay
@@ -73,12 +86,14 @@ jobs:
             cat "$RUNNER_TEMP/coordinator.log" "$RUNNER_TEMP/preview.log"
             exit 1
           fi
-          E2E_REPORT_DIR="$RUNNER_TEMP/bonjou-e2e" npm run e2e:all
+          mkdir -p "$RUNNER_TEMP/bonjou-e2e"
+          node scripts/e2e-capabilities.mjs | tee "$RUNNER_TEMP/bonjou-e2e/capabilities.log"
+          E2E_REPORT_DIR="$RUNNER_TEMP/bonjou-e2e" npm run e2e:all -- --only="$E2E_SUITES"
       - name: Preserve browser verification evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: browser-verification
+          name: browser-verification-${{ matrix.os }}
           path: |
             ${{ runner.temp }}/bonjou-e2e
             ${{ runner.temp }}/coordinator.log
