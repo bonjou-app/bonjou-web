@@ -84,8 +84,9 @@ homepage lab and setup explorer, boundary failures, and mixed Chrome/WebKit
 transfers. UI, motion, LAN, experience, and boundary checks run in both engines.
 CI builds this web revision with a pinned signaling coordinator. Linux runs
 Chrome flows plus WebKit UI/motion; macOS runs native WebKit and mixed-engine
-sharing. Both jobs record runtime capabilities, cover the full suite, and save
-evidence. The separate Web job checks protocol vectors, unit tests,
+sharing. Together the jobs cover the full suite, record runtime capabilities,
+and save evidence. Hosted macOS browser checks use a disposable process with
+local-network permission; normal local verification uses your ordinary account. The separate Web job checks protocol vectors, unit tests,
 dependency audit, and the production build.
 
 See the [comprehensive verification report](docs/superpowers/reports/2026-10-05-bonjou-comprehensive-e2e.md)

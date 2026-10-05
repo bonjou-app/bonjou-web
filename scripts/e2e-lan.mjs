@@ -1,11 +1,12 @@
 /** Real-browser LAN-only chat, room isolation, approval, and file smoke test. */
 
 import { strict as assert } from "node:assert";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { chromium, webkit } from "playwright";
+import { createRtcDiagnostics } from "./rtc-diagnostics.mjs";
 const webkitRun = process.env.PLAYWRIGHT_ENGINE === "webkit";
 const browserType = webkitRun ? webkit : chromium;
 
@@ -13,23 +14,14 @@ const APP = new URL("/app", process.env.APP_URL ?? "http://127.0.0.1:4173")
   .href;
 const BROWSER_CHANNEL = process.env.PLAYWRIGHT_CHANNEL ?? "chrome";
 const OUTPUT = process.env.LAN_SCREENSHOTS ?? join(tmpdir(), "bonjou-lan");
+const diagnostics = createRtcDiagnostics({ output: OUTPUT, suite: "lan" });
 await mkdir(OUTPUT, { recursive: true });
 
 async function contextFor(browser, name) {
   const context = await browser.newContext({ acceptDownloads: true });
+  await diagnostics.observeContext(context, name);
   await context.addInitScript((value) => {
     localStorage.setItem("bonjou.name", value);
-    window.__lanPeers = [];
-    if (typeof RTCPeerConnection !== "undefined") {
-      const native = RTCPeerConnection;
-      window.RTCPeerConnection = new Proxy(native, {
-        construct(target, args) {
-          const peer = Reflect.construct(target, args, target);
-          window.__lanPeers.push(peer);
-          return peer;
-        },
-      });
-    }
   }, name);
   const page = await context.newPage();
   const errors = [];
@@ -274,30 +266,9 @@ async function main() {
       `LAN E2E passed: discovery, chat, room ${roomCode}, isolation, desktop/mobile approval, decline, exact bytes`,
     );
   } catch (error) {
-    for (const client of clients) {
-      const state = await client.page
-        .evaluate(() => ({
-          peerConnection: typeof RTCPeerConnection,
-          peers: window.__lanPeers.map((peer) => ({
-            connection: peer.connectionState,
-            ice: peer.iceConnectionState,
-            gathering: peer.iceGatheringState,
-            signaling: peer.signalingState,
-          })),
-        }))
-        .catch(() => ({ unavailable: true }));
-      await writeFile(
-        join(OUTPUT, `${client.name}-failure.json`),
-        JSON.stringify({ ...state, errors: client.errors }, null, 2),
-      );
-      await client.page
-        .screenshot({
-          path: join(OUTPUT, `${client.name}-failure.png`),
-          fullPage: true,
-        })
-        .catch(() => {});
-      console.error(`${client.name} runtime: ${JSON.stringify(state)}`);
-    }
+    await diagnostics.captureFailure(error).catch(() => {
+      console.error("LAN failure diagnostics could not be fully saved.");
+    });
     throw error;
   } finally {
     for (const client of clients) await client.context.close();

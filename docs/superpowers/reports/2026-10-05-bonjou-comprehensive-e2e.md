@@ -94,6 +94,32 @@ engines. The fresh PR CI suite exercises the complete committed tree.
    No transport setting or timeout was relaxed. The added observer and preflight
    pass locally, and both Chrome/WebKit LAN flows pass after the change.
 
+8. The second hosted run ([37269918811](https://github.com/bonjou-app/bonjou-web/actions/runs/37269918811))
+   confirmed WebRTC and WebCrypto APIs present in both Linux and macOS ports.
+   Missing APIs are ruled out. WebKit still stalled with ICE `new` and gathering;
+   the initiator closed after its existing 15-second discovery deadline. A
+   separate Chrome run timed out discovering the `Unsupported downloads`
+   client; the same workflow had passed in the first hosted run and locally.
+   These failures are retained under
+   [second-run evidence](2026-10-05-bonjou-e2e-evidence/ci-second-run).
+   The underlying negotiation cause is not established from those snapshots.
+   Native candidate types/counts, RTC method outcomes, state transitions,
+   coordinator frame/roster counts, and both client captures are now observed
+   without changing returned RTC promises or logging payload/key/SDP values.
+   Hosted macOS has a documented
+   [local-network permission issue](https://github.com/actions/runner-images/issues/10924).
+   The disposable macOS CI browser process uses Apple's documented
+   [root-process permission context](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy#macOS-considerations)
+   to test permitted LAN behavior. The coordinator, install/build steps, Linux
+   jobs, and normal local checks use the ordinary runner/user account. No
+   production browser or user's privacy setting is changed. Normal nonroot
+   Chrome/WebKit sharing is covered by the passing local runs. This adjustment
+   is being validated by fresh CI; it is not presented as proof of the earlier
+   failures' cause. Chrome/WebKit LAN and the complete Chrome workflows pass
+   again with the expanded diagnostics installed. A deliberate diagnostic
+   capture after a genuine approved local lab transfer verifies both native
+   peer records, method outcomes, closed-client handling, and error redaction.
+
 ## Current captures
 
 - [Desktop light](2026-10-05-bonjou-e2e-evidence/landing-light-1440.png)

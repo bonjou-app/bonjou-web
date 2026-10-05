@@ -4,7 +4,15 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
+import { createRtcDiagnostics } from "./rtc-diagnostics.mjs";
 const BASE = process.env.APP_URL ?? "http://127.0.0.1:4173";
+const diagnostics = createRtcDiagnostics({
+  output:
+    process.env.WORKFLOWS_SCREENSHOTS ??
+    process.env.E2E_REPORT_DIR ??
+    join(tmpdir(), "bonjou-workflows-evidence"),
+  suite: "workflows",
+});
 const browsers = [],
   errors = [];
 const files = await mkdtemp(join(tmpdir(), "bonjou-workflows-"));
@@ -20,6 +28,7 @@ async function client(name, init, path = "/app") {
     reducedMotion: "reduce",
     viewport: { width: 1280, height: 850 },
   });
+  await diagnostics.observeContext(context, name || "Invitee onboarding");
   await context.addInitScript((name) => {
     localStorage.setItem("bonjou.name", name);
     localStorage.setItem("bonjou.theme", "light");
@@ -392,6 +401,7 @@ try {
   });
   browsers.push(stalledBrowser);
   const stalledContext = await stalledBrowser.newContext();
+  await diagnostics.observeContext(stalledContext, "Timeout check");
   await stalledContext.addInitScript(() =>
     localStorage.setItem("bonjou.name", "Timeout check"),
   );
@@ -415,6 +425,11 @@ try {
   console.log(
     "Workflows passed: drafts, home round-trip, name update, matching verification, Unicode/long-name/10 MB/empty/folder downloads, failed approval recovery without payloads, history, invalid room recovery, room-link onboarding, room exit, stale room history normalization, browser Back and background room reconnect, tab handoff, room-link timeout.",
   );
+} catch (error) {
+  await diagnostics.captureFailure(error).catch(() => {
+    console.error("Workflows failure diagnostics could not be fully saved.");
+  });
+  throw error;
 } finally {
   await Promise.all(browsers.map((browser) => browser.close()));
   await rm(files, { recursive: true, force: true });

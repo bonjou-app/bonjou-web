@@ -29,6 +29,8 @@ jobs:
     name: End-to-end browsers (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
     strategy:
       fail-fast: false
       matrix:
@@ -87,8 +89,17 @@ jobs:
             exit 1
           fi
           mkdir -p "$RUNNER_TEMP/bonjou-e2e"
-          node scripts/e2e-capabilities.mjs | tee "$RUNNER_TEMP/bonjou-e2e/capabilities.log"
-          E2E_REPORT_DIR="$RUNNER_TEMP/bonjou-e2e" npm run e2e:all -- --only="$E2E_SUITES"
+          if [ "$RUNNER_OS" = macOS ]; then
+            # Apple's TN3179 grants root processes local-network access. Hosted
+            # runners do not show the interactive permission prompt reliably.
+            # Only this disposable CI browser process uses that permission context.
+            node_executable=$(command -v node)
+            sudo env PATH="$PATH" PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" E2E_RTC_ENGINES="$E2E_RTC_ENGINES" "$node_executable" scripts/e2e-capabilities.mjs | tee "$RUNNER_TEMP/bonjou-e2e/capabilities.log"
+            sudo env PATH="$PATH" PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" E2E_REPORT_DIR="$RUNNER_TEMP/bonjou-e2e" "$node_executable" scripts/e2e-all.mjs --only="$E2E_SUITES"
+          else
+            node scripts/e2e-capabilities.mjs | tee "$RUNNER_TEMP/bonjou-e2e/capabilities.log"
+            E2E_REPORT_DIR="$RUNNER_TEMP/bonjou-e2e" npm run e2e:all -- --only="$E2E_SUITES"
+          fi
       - name: Preserve browser verification evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -97,6 +108,7 @@ jobs:
           path: |
             ${{ runner.temp }}/bonjou-e2e
             ${{ runner.temp }}/coordinator.log
+            ${{ runner.temp }}/coordinator-logs
             ${{ runner.temp }}/preview.log
           retention-days: 14
           if-no-files-found: ignore

@@ -200,6 +200,30 @@
       "durationSeconds": 12.03,
       "code": 0,
       "signal": null
+    },
+    {
+      "name": "lan-chromium",
+      "logFile": "lan-chromium-3.log",
+      "started": "2026-10-05T06:14:16.531Z",
+      "durationSeconds": 13.3,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "workflows-chromium",
+      "logFile": "workflows-chromium-2.log",
+      "started": "2026-10-05T06:14:29.832Z",
+      "durationSeconds": 45.13,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-webkit",
+      "logFile": "lan-webkit-3.log",
+      "started": "2026-10-05T06:15:14.967Z",
+      "durationSeconds": 12.34,
+      "code": 0,
+      "signal": null
     }
   ]
 }

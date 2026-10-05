@@ -1,0 +1,12 @@
+{
+  "peerConnection": "function",
+  "peers": [
+    {
+      "connection": "closed",
+      "ice": "closed",
+      "gathering": "gathering",
+      "signaling": "closed"
+    }
+  ],
+  "errors": []
+}
