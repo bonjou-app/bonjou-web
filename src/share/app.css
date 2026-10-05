@@ -9,7 +9,8 @@
 }
 .blip.is-idle,
 .blip.is-connecting,
-.blip.is-reconnecting {
+.blip.is-reconnecting,
+.blip.is-unavailable {
   background: var(--bj-warn);
 }
 .blip.is-closed {
@@ -67,7 +68,8 @@
 }
 .rail-live.is-idle,
 .rail-live.is-connecting,
-.rail-live.is-reconnecting {
+.rail-live.is-reconnecting,
+.rail-live.is-unavailable {
   color: var(--bj-warn);
 }
 .rail-live.is-closed {

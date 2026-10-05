@@ -57,11 +57,12 @@ To exercise a local coordinator, run this from the CLI repo:
 go run ./cmd/bonjou-relay -origins http://127.0.0.1:4173 -trust-proxy=false
 ```
 
-Then run `npm run smoke` here. To point the browser at the local coordinator, copy
+Then run `APP_ORIGIN=http://127.0.0.1:4173 npm run smoke` here. To point the browser at the local coordinator, copy
 `.env.example` to `.env.local` before starting Vite. The smoke test checks source-network discovery,
 room isolation, encrypted signaling, and rejection of payload endpoints. Set
-`COORDINATOR` to test another coordinator you operate. `RELAY` and
-`VITE_RELAY_URL` remain supported configuration aliases.
+`COORDINATOR` and `APP_ORIGIN` to test another coordinator you operate with the
+real website origin. `RELAY` remains a smoke-test configuration alias; browser
+builds use `VITE_COORDINATOR_URL`.
 
 For the complete sequential browser suite, build and start a preview:
 
@@ -118,12 +119,38 @@ access to this repository only.
 
 Treat `VITE_*` configuration and browser bundles as public. Store service
 credentials in deployment secret storage; keep end-to-end encryption keys on
-clients. The Go coordinator forwards opaque WebRTC signaling and has a separate
-deployment. This web revision requires the signaling-only coordinator in
-`bonjou-app/bonjou-cli` branch `codex/bonjou-web-revamp-coordinator`. Deploy the
-paired coordinator before promoting this web revision. Application data
+clients. The Cloudflare Workers Free adapter and portable Go coordinator both
+forward opaque WebRTC signaling and deploy separately. This web revision uses
+the signaling-only coordinator from
+`bonjou-app/bonjou-cli`. Deploy and verify the coordinator before promoting
+the web revision. Set the public `VITE_COORDINATOR_URL` to its HTTPS base URL
+in the Vercel build environment. Application data
 travels over direct WebRTC; the former relay upload/download endpoints are
 not a fallback.
+
+The build records the same public endpoint and source revision in
+`coordinator-config.json`. Automated production checks require that revision
+to match the deployment event, preventing results from being attributed to a
+different deployment when the production alias changes.
+After deployment, run `npm run check:production` (or set `APP_URL` for another
+deployment). It reads that delivered configuration and tests health, room
+creation/joining, network candidates, encrypted signaling and absent payload
+endpoints with the actual website Origin. Startup health may retry for up to
+90 seconds for hosting startup or maintenance; individual HTTP requests
+and WebSocket opening have ten-second deadlines. Protocol failures are not
+retried. `npm run check:ingress` verifies that forged source-IP headers are
+rejected or keep the caller in its actual source-scoped room. The
+production-sharing workflow runs these checks after successful
+Vercel production deployments, then verifies discovery, chat, QR invites,
+room isolation, transfer approval/decline, and exact downloaded bytes using
+native Google Chrome. It saves browser evidence and can be dispatched manually.
+For a held synthetic room on another internet egress, set
+`CROSS_NETWORK_ROOM_CODE` when running `check:ingress`, or supply the manual
+workflow input. The check requires exact `network_mismatch`, then verifies the
+same peer can still join its own source-network room. An expired room or
+transport error cannot count as successful isolation.
+Local CI proves the application flows against its local coordinator; it does
+not prove availability of the separately hosted production service.
 
 ## Contributing and security
 

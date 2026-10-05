@@ -19,6 +19,7 @@
   },
   "include": [
     "vite.config.ts",
-    "src/share/seo.ts"
+    "src/share/seo.ts",
+    "src/share/coordinatorConfig.ts"
   ]
 }

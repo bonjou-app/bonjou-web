@@ -15,6 +15,7 @@ import {
 } from "./crypto";
 import {
   CoordinatorClient,
+  ROOM_CONNECTION_UNAVAILABLE,
   describe,
   type Candidate,
   type ConnectionStatus,
@@ -36,11 +37,11 @@ import {
   type ChannelControl,
 } from "./webrtc";
 import { entriesFor, folderNameFor, zipSize, zipStream } from "./zip";
+import { resolveCoordinatorBase } from "./coordinatorConfig";
 
-export const COORDINATOR_BASE = (
-  import.meta.env.VITE_COORDINATOR_URL ??
-  "https://bonjou.80-225-228-65.sslip.io"
-).replace(/\/$/, "");
+export const COORDINATOR_BASE = resolveCoordinatorBase(
+  import.meta.env.VITE_COORDINATOR_URL,
+);
 
 const COORDINATOR_WS = `${COORDINATOR_BASE.replace(/^http/, "ws")}/ws`;
 const CONTROL_TIMEOUT_MS = 15_000;
@@ -257,6 +258,7 @@ export function useSession(name: string, active: boolean) {
   const linksRef = useRef<LinkRegistry | null>(null);
 
   const [status, setStatus] = useState<ConnectionStatus>("idle");
+  const statusRef = useRef<ConnectionStatus>("idle");
   const [code, setCode] = useState("");
   const [peers, setPeers] = useState<Peer[]>([]);
   const [selfPeerId, setSelfPeerId] = useState("");
@@ -893,7 +895,12 @@ export function useSession(name: string, active: boolean) {
     const unsubscribe = client.on((event) => {
       switch (event.type) {
         case "status":
+          statusRef.current = event.status;
           setStatus(event.status);
+          if (event.status === "connected")
+            setRoomError((error) =>
+              error === ROOM_CONNECTION_UNAVAILABLE ? "" : error,
+            );
           break;
         case "created":
           setRoomPending(false);
@@ -981,7 +988,9 @@ export function useSession(name: string, active: boolean) {
       roomTimer.current = setTimeout(() => {
         setRoomPending(false);
         setRoomError(
-          "The room did not respond. Check your connection and try again.",
+          statusRef.current === "unavailable"
+            ? ROOM_CONNECTION_UNAVAILABLE
+            : "The room did not respond. Check your connection and try again.",
         );
         replaceSessionRoute("/app");
         setCode("");
@@ -1183,13 +1192,19 @@ export function useSession(name: string, active: boolean) {
   const beginRoom = useCallback(
     (value?: string) => {
       if (!clientRef.current || roomPending) return;
+      if (statusRef.current === "unavailable") {
+        setRoomError(ROOM_CONNECTION_UNAVAILABLE);
+        return;
+      }
       setRoomError("");
       setRoomPending(true);
       if (roomTimer.current) clearTimeout(roomTimer.current);
       roomTimer.current = setTimeout(() => {
         setRoomPending(false);
         setRoomError(
-          "The room did not respond. Check your connection and try again.",
+          statusRef.current === "unavailable"
+            ? ROOM_CONNECTION_UNAVAILABLE
+            : "The room did not respond. Check your connection and try again.",
         );
         replaceSessionRoute("/app");
         setCode("");

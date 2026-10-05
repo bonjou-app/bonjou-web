@@ -1,0 +1,57 @@
+name: Production sharing
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      cross-network-room-code:
+        description: Optional live synthetic room held open from another network
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  coordinator:
+    if: github.event_name == 'workflow_dispatch' || (github.event.deployment.environment == 'Production' && github.event.deployment_status.state == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.deployment.sha || github.sha }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run check:production
+        env:
+          APP_URL: https://bonjou.vercel.app
+          EXPECT_APP_REVISION: ${{ github.event.deployment.sha || github.sha }}
+      - name: Verify source-network ingress headers
+        run: npm run check:ingress
+        env:
+          APP_URL: https://bonjou.vercel.app
+          EXPECT_APP_REVISION: ${{ github.event.deployment.sha || github.sha }}
+          CROSS_NETWORK_ROOM_CODE: ${{ inputs.cross-network-room-code }}
+      - name: Install native Google Chrome
+        run: npx playwright install --with-deps chrome
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
+      - name: Verify deployed sharing in native Chrome
+        run: npm run e2e:lan
+        env:
+          APP_URL: https://bonjou.vercel.app
+          PLAYWRIGHT_CHANNEL: chrome
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
+          LAN_SCREENSHOTS: ${{ runner.temp }}/bonjou-production-browser
+      - name: Preserve production browser verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-browser-verification
+          path: ${{ runner.temp }}/bonjou-production-browser
+          retention-days: 14
+          if-no-files-found: ignore

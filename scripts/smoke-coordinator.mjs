@@ -8,6 +8,10 @@ const BASE = (
   "http://127.0.0.1:46330"
 ).replace(/\/$/, "");
 const WS_URL = `${BASE.replace(/^http/, "ws")}/ws`;
+const APP_ORIGIN = new URL(
+  process.env.APP_ORIGIN ?? process.env.APP_URL ?? "http://localhost:5173",
+).origin;
+const CONNECT_TIMEOUT_MS = 10_000;
 const AAD = new TextEncoder().encode("bonjou.v2");
 const enc = new TextEncoder();
 
@@ -107,7 +111,9 @@ function keypair() {
 }
 
 function connect(label, keys) {
-  const socket = new WebSocket(WS_URL);
+  // Node 24's built-in Undici WebSocket supports handshake headers. Sending
+  // the real app Origin tests the same reverse-proxy policy as browsers.
+  const socket = new WebSocket(WS_URL, { headers: { Origin: APP_ORIGIN } });
   const waiters = [];
   const backlog = [];
   socket.addEventListener("message", (event) => {
@@ -144,10 +150,22 @@ function connect(label, keys) {
     },
   };
   return new Promise((resolve, reject) => {
-    socket.addEventListener("open", () => resolve(peer));
-    socket.addEventListener("error", () =>
-      reject(new Error(`${label}: WebSocket failed`)),
-    );
+    const timer = setTimeout(() => {
+      socket.close();
+      reject(new Error(`${label}: coordinator WebSocket did not open within 10 seconds`));
+    }, CONNECT_TIMEOUT_MS);
+    socket.addEventListener("open", () => {
+      clearTimeout(timer);
+      resolve(peer);
+    }, { once: true });
+    socket.addEventListener("error", () => {
+      clearTimeout(timer);
+      reject(new Error(`${label}: WebSocket failed for app origin ${APP_ORIGIN}`));
+    }, { once: true });
+    socket.addEventListener("close", () => {
+      clearTimeout(timer);
+      reject(new Error(`${label}: WebSocket closed before opening`));
+    }, { once: true });
   });
 }
 
@@ -170,9 +188,12 @@ async function enterLobby(peer) {
 
 async function main() {
   console.log(`coordinator: ${BASE}`);
-  const health = await fetch(`${BASE}/healthz`).then((response) =>
-    response.json(),
-  );
+  console.log(`app origin: ${APP_ORIGIN}`);
+  const response = await fetch(`${BASE}/healthz`, {
+    signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`coordinator health returned HTTP ${response.status}`);
+  const health = await response.json();
   check(
     "health endpoint responds",
     health.status === "ok",
@@ -271,6 +292,7 @@ async function main() {
 
   const payloadRoute = await fetch(`${BASE}/t/not-a-transfer`, {
     method: "POST",
+    signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
   });
   check(
     "HTTP payload endpoint is absent",

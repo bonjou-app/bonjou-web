@@ -300,13 +300,15 @@ export function Thread(props: ThreadProps) {
               </Button>
             </div>
             <p className="connection-note" role="status">
-              {status === "reconnecting" || status === "closed"
-                ? "Connection lost. Trying again…"
-                : connectionSlow
-                  ? "A nearby device was found, but the direct connection has not opened."
-                  : status !== "connected"
-                    ? "Connecting to Bonjou…"
-                    : "Ready. Keep this tab open."}
+              {status === "unavailable"
+                ? "Bonjou's connection service is unavailable. Retrying automatically…"
+                : status === "reconnecting" || status === "closed"
+                  ? "Connection lost. Trying again…"
+                  : connectionSlow
+                    ? "A nearby device was found, but the direct connection has not opened."
+                    : status !== "connected"
+                      ? "Connecting to Bonjou…"
+                      : "Ready. Keep this tab open."}
             </p>
             <Accordion
               type="single"

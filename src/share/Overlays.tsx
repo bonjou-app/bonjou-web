@@ -8,6 +8,10 @@ import { UsersThree } from "@phosphor-icons/react/dist/csr/UsersThree";
 import { SignIn } from "@phosphor-icons/react/dist/csr/SignIn";
 import { ShieldCheck } from "@phosphor-icons/react/dist/csr/ShieldCheck";
 
+import {
+  ROOM_CONNECTION_UNAVAILABLE,
+  type ConnectionStatus,
+} from "./coordinator";
 import { CopyButton } from "@/components/interior/copy-button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -217,6 +221,7 @@ export function RoomDialog({
   onLeave,
   pending,
   error,
+  status,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -227,6 +232,7 @@ export function RoomDialog({
   onLeave: () => void;
   pending: boolean;
   error: string;
+  status: ConnectionStatus;
 }) {
   const [entry, setEntry] = useState("");
   const link = code ? `${window.location.origin}/r/${code}` : "";
@@ -252,9 +258,11 @@ export function RoomDialog({
         </DialogDescription>
       </DialogHeader>
 
-      {error ? (
+      {error || status === "unavailable" ? (
         <Alert variant="destructive" id="room-code-error">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>
+            {status === "unavailable" ? ROOM_CONNECTION_UNAVAILABLE : error}
+          </AlertDescription>
         </Alert>
       ) : null}
       {code ? (
