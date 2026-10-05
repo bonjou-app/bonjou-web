@@ -54,7 +54,7 @@ engines. The fresh PR CI suite exercises the complete committed tree.
 | Polish: Chrome                | Sixteen populated axe scans, touch targets, focus traps/returns, input/error association and recovery, narrow and short-window reflow.                                                                                                                                                                                                                                                                |
 | Resilience: Chrome            | Concurrent and queued byte-exact files, direct mid-payload peer loss on both sides, room-scoped coordinator reconnection.                                                                                                                                                                                                                                                                             |
 | Staging: Chrome               | Local preparation, paste, folders, named broadcast, explicit offers, no reads before approval, exact bytes, Undo/expiry, invalidated late drops, departed private recipient retention/recovery, short-window controls.                                                                                                                                                                                |
-| Mixed Chrome ↔ WebKit        | Bidirectional chat, matching independently checked fingerprints, approval before reads/downloads, SHA-256 and exact downloads, declines both ways, no HTTP payload writes, departure preserves private drafts/staging and disables departed targets.                                                                                                                                                  |
+| Mixed Chrome ↔ WebKit         | Bidirectional chat, matching independently checked fingerprints, approval before reads/downloads, SHA-256 and exact downloads, declines both ways, no HTTP payload writes, departure preserves private drafts/staging and disables departed targets.                                                                                                                                                  |
 | Boundaries: Chrome and WebKit | Genuine 0-byte/2 MiB native lab downloads; receiver-corruption rejection and clean retry; unchanged 20-second deadline and retry; unmount closes peer connections/channels and revokes Blob URLs; all ten artwork variants decode; system/manual/persisted theme; navigation resizing. Real single/multiline clipboard round-trips run in Chrome; WebKit grant is unsupported and explicitly skipped. |
 | Coordinator smoke             | Health, network-scoped rooms, roster without profile names, equal derived signaling keys, opaque encrypted signaling preserved, legacy payload frames rejected, HTTP payload route returns 404.                                                                                                                                                                                                       |
 | Go race/vet/lint/format       | Fresh uncached race suite: 115 top-level passes across five packages, one Windows-only skip on macOS; vet and golangci-lint pass; all 63 tracked Go files formatted. [Raw logs and count summary](2026-10-05-bonjou-e2e-evidence/backend/summary.json).                                                                                                                                               |
@@ -119,6 +119,12 @@ engines. The fresh PR CI suite exercises the complete committed tree.
    again with the expanded diagnostics installed. A deliberate diagnostic
    capture after a genuine approved local lab transfer verifies both native
    peer records, method outcomes, closed-client handling, and error redaction.
+
+9. Run [37271700933](https://github.com/bonjou-app/bonjou-web/actions/runs/37271700933)
+   stopped before creating jobs because the browser cache path used
+   `runner.temp` in job-level `env`. GitHub only makes that context available
+   at step level. The install and verification steps now set the same cache
+   path in their own environments. This attempt supplied no browser results.
 
 ## Current captures
 
