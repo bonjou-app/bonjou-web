@@ -1,0 +1,14 @@
+coordinator: http://127.0.0.1:46330
+  ok    health endpoint responds: {"rooms":0,"status":"ok","uptime_sec":1192}
+  ok    health has no transfer data plane
+  ok    roster exposes no display name
+  ok    roster carries only the public session key
+  ok    room created: CCR-Z9R
+  ok    second peer joined the same room
+  ok    both peers derive the same signal key
+  ok    coordinator preserves opaque signal bytes
+  ok    recipient decrypts signaling
+  ok    legacy payload frames are rejected
+  ok    HTTP payload endpoint is absent: 404
+
+All checks passed.
