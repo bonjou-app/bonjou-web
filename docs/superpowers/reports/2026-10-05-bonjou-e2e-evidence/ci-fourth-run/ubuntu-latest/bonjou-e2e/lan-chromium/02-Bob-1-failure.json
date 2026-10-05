@@ -1,0 +1,581 @@
+{
+  "suite": "lan",
+  "failure": {
+    "name": "TimeoutError",
+    "category": "timeout"
+  },
+  "label": "Bob-1",
+  "pageErrors": [
+    {
+      "name": "SecurityError",
+      "category": "other"
+    }
+  ],
+  "sockets": [
+    {
+      "id": 1,
+      "sent": {
+        "hello": 1,
+        "signal": 4,
+        "join": 1
+      },
+      "received": {
+        "joined": 2,
+        "roster": 3,
+        "signal": 4,
+        "peer_left": 1
+      },
+      "rosterCount": 1,
+      "closed": false
+    }
+  ],
+  "events": [
+    {
+      "at": "2026-10-05T06:27:55.230Z",
+      "event": "pageerror",
+      "name": "SecurityError",
+      "category": "other"
+    },
+    {
+      "at": "2026-10-05T06:27:55.712Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "sent",
+      "type": "hello"
+    },
+    {
+      "at": "2026-10-05T06:27:55.718Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "received",
+      "type": "joined"
+    },
+    {
+      "at": "2026-10-05T06:27:55.720Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "received",
+      "type": "roster",
+      "rosterCount": 1
+    },
+    {
+      "at": "2026-10-05T06:27:55.729Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "received",
+      "type": "signal"
+    },
+    {
+      "at": "2026-10-05T06:27:55.729Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "received",
+      "type": "signal"
+    },
+    {
+      "at": "2026-10-05T06:27:55.732Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "sent",
+      "type": "signal"
+    },
+    {
+      "at": "2026-10-05T06:27:55.734Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "sent",
+      "type": "signal"
+    },
+    {
+      "at": "2026-10-05T06:27:56.555Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "received",
+      "type": "peer_left"
+    },
+    {
+      "at": "2026-10-05T06:27:56.557Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "received",
+      "type": "roster",
+      "rosterCount": 0
+    },
+    {
+      "at": "2026-10-05T06:27:56.914Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "sent",
+      "type": "join"
+    },
+    {
+      "at": "2026-10-05T06:27:56.946Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "received",
+      "type": "joined"
+    },
+    {
+      "at": "2026-10-05T06:27:56.961Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "received",
+      "type": "roster",
+      "rosterCount": 1
+    },
+    {
+      "at": "2026-10-05T06:27:56.963Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "received",
+      "type": "signal"
+    },
+    {
+      "at": "2026-10-05T06:27:56.963Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "received",
+      "type": "signal"
+    },
+    {
+      "at": "2026-10-05T06:27:56.982Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "sent",
+      "type": "signal"
+    },
+    {
+      "at": "2026-10-05T06:27:56.983Z",
+      "socket": 1,
+      "event": "coordinator-frame",
+      "direction": "sent",
+      "type": "signal"
+    }
+  ],
+  "droppedEvents": 0,
+  "runtime": {
+    "nativeApis": {
+      "peerConnection": "function",
+      "dataChannel": "function",
+      "secureContext": true,
+      "webCrypto": true
+    },
+    "omittedPeers": 0,
+    "droppedEvents": 0,
+    "peers": [
+      {
+        "id": 1,
+        "candidates": {
+          "local": {
+            "host/mdns": 1,
+            "end/none": 1
+          },
+          "remote": {
+            "host/mdns": 1
+          }
+        },
+        "methods": {
+          "setRemoteDescription": 1,
+          "addIceCandidate": 1,
+          "setLocalDescription": 1
+        },
+        "channels": [
+          {
+            "id": 1,
+            "kind": "control",
+            "direction": "incoming",
+            "state": "closed"
+          }
+        ],
+        "omittedChannels": 0,
+        "connection": "closed",
+        "ice": "closed",
+        "gathering": "complete",
+        "signaling": "closed"
+      },
+      {
+        "id": 2,
+        "candidates": {
+          "local": {
+            "host/mdns": 1,
+            "end/none": 1
+          },
+          "remote": {
+            "host/mdns": 1
+          }
+        },
+        "methods": {
+          "setRemoteDescription": 1,
+          "addIceCandidate": 1,
+          "setLocalDescription": 1
+        },
+        "channels": [
+          {
+            "id": 1,
+            "kind": "control",
+            "direction": "incoming",
+            "state": "open"
+          }
+        ],
+        "omittedChannels": 0,
+        "connection": "connected",
+        "ice": "connected",
+        "gathering": "complete",
+        "signaling": "stable"
+      }
+    ],
+    "events": [
+      {
+        "atMs": 469,
+        "peer": 1,
+        "event": "created",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 469,
+        "peer": 1,
+        "event": "method-called",
+        "method": "setRemoteDescription"
+      },
+      {
+        "atMs": 470,
+        "peer": 1,
+        "event": "signalingstatechange",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "have-remote-offer"
+      },
+      {
+        "atMs": 470,
+        "peer": 1,
+        "event": "method-fulfilled",
+        "method": "setRemoteDescription",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "have-remote-offer"
+      },
+      {
+        "atMs": 470,
+        "peer": 1,
+        "event": "method-called",
+        "method": "addIceCandidate"
+      },
+      {
+        "atMs": 470,
+        "peer": 1,
+        "event": "candidate",
+        "direction": "remote",
+        "type": "host",
+        "addressKind": "mdns"
+      },
+      {
+        "atMs": 471,
+        "peer": 1,
+        "event": "method-fulfilled",
+        "method": "addIceCandidate",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "have-remote-offer"
+      },
+      {
+        "atMs": 471,
+        "peer": 1,
+        "event": "method-called",
+        "method": "setLocalDescription"
+      },
+      {
+        "atMs": 472,
+        "peer": 1,
+        "event": "signalingstatechange",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 472,
+        "peer": 1,
+        "event": "method-fulfilled",
+        "method": "setLocalDescription",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 473,
+        "peer": 1,
+        "event": "icegatheringstatechange",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "gathering",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 474,
+        "peer": 1,
+        "event": "iceconnectionstatechange",
+        "connection": "new",
+        "ice": "checking",
+        "gathering": "gathering",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 474,
+        "peer": 1,
+        "event": "candidate",
+        "direction": "local",
+        "type": "host",
+        "addressKind": "mdns"
+      },
+      {
+        "atMs": 474,
+        "peer": 1,
+        "event": "connectionstatechange",
+        "connection": "connecting",
+        "ice": "checking",
+        "gathering": "gathering",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 475,
+        "peer": 1,
+        "event": "iceconnectionstatechange",
+        "connection": "connecting",
+        "ice": "connected",
+        "gathering": "gathering",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 475,
+        "peer": 1,
+        "event": "icegatheringstatechange",
+        "connection": "connecting",
+        "ice": "connected",
+        "gathering": "complete",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 475,
+        "peer": 1,
+        "event": "candidate",
+        "direction": "local",
+        "type": "end",
+        "addressKind": "none"
+      },
+      {
+        "atMs": 477,
+        "peer": 1,
+        "event": "connectionstatechange",
+        "connection": "connected",
+        "ice": "connected",
+        "gathering": "complete",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 480,
+        "peer": 1,
+        "event": "channel-created",
+        "id": 1,
+        "kind": "control",
+        "direction": "incoming",
+        "state": "open"
+      },
+      {
+        "atMs": 480,
+        "peer": 1,
+        "event": "channel-open",
+        "id": 1,
+        "kind": "control",
+        "direction": "incoming",
+        "state": "open"
+      },
+      {
+        "atMs": 1295,
+        "peer": 1,
+        "event": "channel-close",
+        "id": 1,
+        "kind": "control",
+        "direction": "incoming",
+        "state": "closed"
+      },
+      {
+        "atMs": 1702,
+        "peer": 2,
+        "event": "created",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 1703,
+        "peer": 2,
+        "event": "method-called",
+        "method": "setRemoteDescription"
+      },
+      {
+        "atMs": 1709,
+        "peer": 2,
+        "event": "signalingstatechange",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "have-remote-offer"
+      },
+      {
+        "atMs": 1709,
+        "peer": 2,
+        "event": "method-fulfilled",
+        "method": "setRemoteDescription",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "have-remote-offer"
+      },
+      {
+        "atMs": 1709,
+        "peer": 2,
+        "event": "method-called",
+        "method": "addIceCandidate"
+      },
+      {
+        "atMs": 1709,
+        "peer": 2,
+        "event": "candidate",
+        "direction": "remote",
+        "type": "host",
+        "addressKind": "mdns"
+      },
+      {
+        "atMs": 1721,
+        "peer": 2,
+        "event": "method-fulfilled",
+        "method": "addIceCandidate",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "have-remote-offer"
+      },
+      {
+        "atMs": 1721,
+        "peer": 2,
+        "event": "method-called",
+        "method": "setLocalDescription"
+      },
+      {
+        "atMs": 1722,
+        "peer": 2,
+        "event": "signalingstatechange",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 1722,
+        "peer": 2,
+        "event": "method-fulfilled",
+        "method": "setLocalDescription",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "new",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 1723,
+        "peer": 2,
+        "event": "icegatheringstatechange",
+        "connection": "new",
+        "ice": "new",
+        "gathering": "gathering",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 1723,
+        "peer": 2,
+        "event": "iceconnectionstatechange",
+        "connection": "new",
+        "ice": "checking",
+        "gathering": "gathering",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 1723,
+        "peer": 2,
+        "event": "candidate",
+        "direction": "local",
+        "type": "host",
+        "addressKind": "mdns"
+      },
+      {
+        "atMs": 1724,
+        "peer": 2,
+        "event": "connectionstatechange",
+        "connection": "connecting",
+        "ice": "checking",
+        "gathering": "gathering",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 1724,
+        "peer": 2,
+        "event": "iceconnectionstatechange",
+        "connection": "connecting",
+        "ice": "connected",
+        "gathering": "gathering",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 1725,
+        "peer": 2,
+        "event": "icegatheringstatechange",
+        "connection": "connecting",
+        "ice": "connected",
+        "gathering": "complete",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 1725,
+        "peer": 2,
+        "event": "candidate",
+        "direction": "local",
+        "type": "end",
+        "addressKind": "none"
+      },
+      {
+        "atMs": 1730,
+        "peer": 2,
+        "event": "connectionstatechange",
+        "connection": "connected",
+        "ice": "connected",
+        "gathering": "complete",
+        "signaling": "stable"
+      },
+      {
+        "atMs": 1733,
+        "peer": 2,
+        "event": "channel-created",
+        "id": 1,
+        "kind": "control",
+        "direction": "incoming",
+        "state": "open"
+      },
+      {
+        "atMs": 1733,
+        "peer": 2,
+        "event": "channel-open",
+        "id": 1,
+        "kind": "control",
+        "direction": "incoming",
+        "state": "open"
+      }
+    ]
+  }
+}

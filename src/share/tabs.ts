@@ -3,9 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /**
  * Recognising this browser's own tabs.
  *
- * Every tab opens its own relay connection and generates its own keypair,
- * so the relay sees each one as a separate person and puts them all in the
- * same network room. That is correct from where the relay stands: it
+ * Every tab opens its own coordinator connection and generates its own keypair,
+ * so the coordinator sees each one as a separate candidate and puts them all in
+ * the same network group. That is correct from where the coordinator stands: it
  * groups by public address, and it cannot tell a second tab from a
  * colleague at the next desk. From where the user stands it is nonsense,
  * because their own name comes back two or three times and a broadcast to
@@ -18,18 +18,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
  *
  * A browser can answer that question by itself. BroadcastChannel is
  * scoped to an origin within a single browser profile, so tabs of one
- * browser can name their relay ids to each other and nobody else hears
+ * browser can name their coordinator ids to each other and nobody else hears
  * it. Another browser, another profile, and a private window each get
  * their own channel and stay separate people, which is right: those are
  * genuinely separate sessions with separate keys.
  *
- * The relay learns nothing new. No identifier is added to the protocol
+ * The coordinator learns nothing new. No identifier is added to the protocol
  * and no state is persisted, so this costs no privacy to fix.
  */
 const CHANNEL = "bonjou.tabs";
 
 type TabMessage =
-  /** I exist, and this is the relay id I am using. */
+  /** I exist, and this is the coordinator id I am using. */
   | { kind: "here"; peerId: string }
   /** Somebody just opened. Everyone say who you are. */
   | { kind: "who" }
@@ -37,9 +37,9 @@ type TabMessage =
   | { kind: "gone"; peerId: string };
 
 /**
- * The relay ids belonging to this browser's *other* tabs.
+ * The coordinator ids belonging to this browser's *other* tabs.
  *
- * `selfPeerId` is this tab's own id, which arrives from the relay after
+ * `selfPeerId` is this tab's own id, which arrives from the coordinator after
  * the connection is established. Until it does there is nothing to
  * announce, and the set stays empty.
  */
@@ -90,7 +90,7 @@ export function useSiblingTabs(selfPeerId: string): Set<string> {
 
     // pagehide rather than unload: it is the one that fires on iOS Safari
     // and when a tab is put into the back/forward cache. Losing it is not
-    // fatal, since the relay drops the peer from the roster anyway, but it
+    // fatal, since the coordinator drops the peer from the roster anyway, but it
     // keeps the set from carrying an id that is already gone.
     const onLeave = () =>
       channel.postMessage({ kind: "gone", peerId: selfPeerId } satisfies TabMessage);
@@ -123,7 +123,7 @@ export function useSiblingTabs(selfPeerId: string): Set<string> {
  *
  * So the duplication is prevented instead of repaired. One tab holds a
  * Web Lock and owns the connection; the others do not connect at all.
- * There is then exactly one of you on the relay and nothing anywhere
+ * There is then exactly one of you on the coordinator and nothing anywhere
  * needs to deduplicate.
  *
  * Locks are released by the browser when a tab closes or crashes, so the

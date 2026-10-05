@@ -1,0 +1,229 @@
+{
+  "origin": "http://127.0.0.1:4173",
+  "results": [
+    {
+      "name": "ui-chromium",
+      "logFile": "ui-chromium-1.log",
+      "started": "2026-10-05T05:21:15.999Z",
+      "durationSeconds": 16.75,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "motion-chromium",
+      "logFile": "motion-chromium-1.log",
+      "started": "2026-10-05T05:21:32.749Z",
+      "durationSeconds": 12.53,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-chromium",
+      "logFile": "lan-chromium-1.log",
+      "started": "2026-10-05T05:21:45.281Z",
+      "durationSeconds": 13.42,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "experience-chromium",
+      "logFile": "experience-chromium-1.log",
+      "started": "2026-10-05T05:21:58.705Z",
+      "durationSeconds": 13.35,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "workflows-chromium",
+      "logFile": "workflows-chromium-1.log",
+      "started": "2026-10-05T05:22:12.058Z",
+      "durationSeconds": 43.19,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "accessibility-chromium",
+      "logFile": "accessibility-chromium-1.log",
+      "started": "2026-10-05T05:22:55.250Z",
+      "durationSeconds": 11.67,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "polish-chromium",
+      "logFile": "polish-chromium-1.log",
+      "started": "2026-10-05T05:23:06.924Z",
+      "durationSeconds": 22.98,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "resilience-chromium",
+      "logFile": "resilience-chromium-1.log",
+      "started": "2026-10-05T05:23:29.900Z",
+      "durationSeconds": 12.34,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "staging-chromium",
+      "logFile": "staging-chromium-1.log",
+      "started": "2026-10-05T05:23:42.237Z",
+      "durationSeconds": 11.22,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "ui-webkit",
+      "logFile": "ui-webkit-1.log",
+      "started": "2026-10-05T05:23:53.453Z",
+      "durationSeconds": 0.25,
+      "code": 1,
+      "signal": null
+    },
+    {
+      "name": "ui-chromium",
+      "logFile": "ui-chromium-2.log",
+      "started": "2026-10-05T05:28:10.157Z",
+      "durationSeconds": 15.75,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "ui-webkit",
+      "logFile": "ui-webkit-2.log",
+      "started": "2026-10-05T05:28:25.912Z",
+      "durationSeconds": 23.68,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "motion-webkit",
+      "logFile": "motion-webkit-1.log",
+      "started": "2026-10-05T05:28:49.594Z",
+      "durationSeconds": 15.84,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-webkit",
+      "logFile": "lan-webkit-1.log",
+      "started": "2026-10-05T05:29:05.430Z",
+      "durationSeconds": 15.61,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "experience-webkit",
+      "logFile": "experience-webkit-1.log",
+      "started": "2026-10-05T05:29:21.045Z",
+      "durationSeconds": 15.51,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "cross-browser-mixed",
+      "logFile": "cross-browser-mixed-1.log",
+      "started": "2026-10-05T05:29:36.553Z",
+      "durationSeconds": 9.61,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "boundaries-chromium",
+      "logFile": "boundaries-chromium-1.log",
+      "started": "2026-10-05T05:29:46.167Z",
+      "durationSeconds": 29.06,
+      "code": 1,
+      "signal": null
+    },
+    {
+      "name": "boundaries-chromium",
+      "logFile": "boundaries-chromium-2.log",
+      "started": "2026-10-05T05:34:03.609Z",
+      "durationSeconds": 32.58,
+      "code": 1,
+      "signal": null
+    },
+    {
+      "name": "ui-chromium",
+      "logFile": "ui-chromium-3.log",
+      "started": "2026-10-05T05:35:22.637Z",
+      "durationSeconds": 24.39,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "ui-webkit",
+      "logFile": "ui-webkit-3.log",
+      "started": "2026-10-05T05:35:47.053Z",
+      "durationSeconds": 19.5,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "boundaries-chromium",
+      "logFile": "boundaries-chromium-3.log",
+      "started": "2026-10-05T05:36:06.559Z",
+      "durationSeconds": 38.15,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "boundaries-webkit",
+      "logFile": "boundaries-webkit-1.log",
+      "started": "2026-10-05T05:36:44.711Z",
+      "durationSeconds": 36.19,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "smoke-coordinator",
+      "logFile": "smoke-coordinator-1.log",
+      "started": "2026-10-05T05:37:20.901Z",
+      "durationSeconds": 0.23,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-chromium",
+      "logFile": "lan-chromium-2.log",
+      "started": "2026-10-05T05:53:45.960Z",
+      "durationSeconds": 14.51,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-webkit",
+      "logFile": "lan-webkit-2.log",
+      "started": "2026-10-05T05:54:00.475Z",
+      "durationSeconds": 12.03,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-chromium",
+      "logFile": "lan-chromium-3.log",
+      "started": "2026-10-05T06:14:16.531Z",
+      "durationSeconds": 13.3,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "workflows-chromium",
+      "logFile": "workflows-chromium-2.log",
+      "started": "2026-10-05T06:14:29.832Z",
+      "durationSeconds": 45.13,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-webkit",
+      "logFile": "lan-webkit-3.log",
+      "started": "2026-10-05T06:15:14.967Z",
+      "durationSeconds": 12.34,
+      "code": 0,
+      "signal": null
+    }
+  ]
+}

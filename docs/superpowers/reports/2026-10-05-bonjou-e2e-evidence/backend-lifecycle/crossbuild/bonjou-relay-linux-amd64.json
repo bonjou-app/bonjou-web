@@ -1,0 +1,27 @@
+{
+  "head": "df923b6d5440b037212c2dbb3a08456d46e1c488",
+  "target": {
+    "name": "bonjou-relay",
+    "os": "linux",
+    "arch": "amd64"
+  },
+  "command": [
+    "go",
+    "build",
+    "-trimpath",
+    "-o",
+    "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-relay-linux-amd64",
+    "./cmd/bonjou-relay"
+  ],
+  "env": {
+    "CGO_ENABLED": "0",
+    "GOOS": "linux",
+    "GOARCH": "amd64"
+  },
+  "exit_code": 0,
+  "seconds": 2.55,
+  "artifact": "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-relay-linux-amd64",
+  "log": "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-relay-linux-amd64.log",
+  "sha256": "8a6057edc3a33daa7c8da5812c5b886f13e7b8f6a9eb84f5b57dfeed0ccbabdd",
+  "bytes": 10316087
+}

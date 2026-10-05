@@ -1,0 +1,7 @@
+Alice runtime: {"peerConnection":"function","peers":[{"connection":"closed","ice":"closed","gathering":"gathering","signaling":"closed"}]}
+Bob runtime: {"peerConnection":"function","peers":[{"connection":"new","ice":"new","gathering":"gathering","signaling":"stable"}]}
+locator.waitFor: Timeout 20000ms exceeded.
+Call log:
+  - waiting for getByText('Bob', { exact: true }).first() to be visible
+
+    at main (/Users/runner/work/bonjou-web/bonjou-web/scripts/e2e-lan.mjs:106:8)

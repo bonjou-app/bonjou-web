@@ -17,10 +17,99 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '24'
+          node-version: "24"
           cache: npm
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: npm run check:protocol
       - run: npm test
       - run: npm run build
+
+  end-to-end:
+    name: End-to-end browsers (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rtc-engines: chromium
+            suites: ui-chromium,motion-chromium,lan-chromium,experience-chromium,workflows-chromium,accessibility-chromium,polish-chromium,resilience-chromium,staging-chromium,ui-webkit,motion-webkit,boundaries-chromium,smoke-coordinator
+          - os: macos-latest
+            rtc-engines: chromium,webkit
+            suites: ui-webkit,motion-webkit,lan-webkit,experience-webkit,cross-browser-mixed,boundaries-webkit,smoke-coordinator
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: bonjou-app/bonjou-cli
+          ref: 0e30775c9efeded215930ab46aaffaa65a8c85ea
+          path: .e2e-cli
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .e2e-cli/go.mod
+          cache-dependency-path: .e2e-cli/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chrome webkit
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
+      - run: npm run check:protocol -- .e2e-cli
+      - run: npm run build
+        env:
+          VITE_COORDINATOR_URL: http://127.0.0.1:46330
+      - name: Verify complete browser journeys
+        shell: bash
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright
+          E2E_SUITES: ${{ matrix.suites }}
+          E2E_RTC_ENGINES: ${{ matrix.rtc-engines }}
+        run: |
+          set -euo pipefail
+          go build -C .e2e-cli -o "$RUNNER_TEMP/bonjou-coordinator" ./cmd/bonjou-relay
+          "$RUNNER_TEMP/bonjou-coordinator" -origins http://127.0.0.1:4173 -trust-proxy=false -log-dir "$RUNNER_TEMP/coordinator-logs" >"$RUNNER_TEMP/coordinator.log" 2>&1 &
+          coordinator_pid=$!
+          npm run preview -- --port 4173 --strictPort >"$RUNNER_TEMP/preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$coordinator_pid" "$preview_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:46330/healthz >/dev/null && curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            cat "$RUNNER_TEMP/coordinator.log" "$RUNNER_TEMP/preview.log"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/bonjou-e2e"
+          if [ "$RUNNER_OS" = macOS ]; then
+            # Apple's TN3179 grants root processes local-network access. Hosted
+            # runners do not show the interactive permission prompt reliably.
+            # Only this disposable CI browser process uses that permission context.
+            node_executable=$(command -v node)
+            sudo env PATH="$PATH" PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" E2E_RTC_ENGINES="$E2E_RTC_ENGINES" "$node_executable" scripts/e2e-capabilities.mjs | tee "$RUNNER_TEMP/bonjou-e2e/capabilities.log"
+            sudo env PATH="$PATH" PLAYWRIGHT_BROWSERS_PATH="$PLAYWRIGHT_BROWSERS_PATH" E2E_REPORT_DIR="$RUNNER_TEMP/bonjou-e2e" "$node_executable" scripts/e2e-all.mjs --only="$E2E_SUITES"
+          else
+            node scripts/e2e-capabilities.mjs | tee "$RUNNER_TEMP/bonjou-e2e/capabilities.log"
+            E2E_REPORT_DIR="$RUNNER_TEMP/bonjou-e2e" npm run e2e:all -- --only="$E2E_SUITES"
+          fi
+      - name: Preserve browser verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-verification-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/bonjou-e2e
+            ${{ runner.temp }}/coordinator.log
+            ${{ runner.temp }}/coordinator-logs
+            ${{ runner.temp }}/preview.log
+          retention-days: 14
+          if-no-files-found: ignore

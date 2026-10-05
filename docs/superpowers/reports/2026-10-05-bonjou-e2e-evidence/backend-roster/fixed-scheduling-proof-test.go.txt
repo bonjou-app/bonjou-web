@@ -1,0 +1,65 @@
+package relay
+
+import (
+ "sync"
+ "testing"
+ "time"
+)
+
+func TestScheduledRosterSnapshotCannotOvertakeMembership(t *testing.T) {
+ h := NewHub(DefaultLimits(), nil)
+ bob, alice := newPeer("bob", ""), newPeer("alice", "")
+ room, err := h.joinNetwork("192.0.2.1",bob)
+ if err != nil { t.Fatal(err) }
+ captured, resume, finished := make(chan struct{}),make(chan struct{}),make(chan struct{})
+ var pause, release sync.Once
+ unblock := func() { release.Do(func(){close(resume)}) }; defer unblock()
+ beforeRosterEnqueueForTest = func(p *Peer,msg *serverMessage) {
+  if p==bob && msg.Type==msgRoster && len(msg.Peers)==0 { pause.Do(func(){close(captured); <-resume}) }
+ }
+ go func(){h.notifyRosters(room);close(finished)}()
+ select {case <-captured: case <-time.After(5*time.Second):t.Fatal("old snapshot did not reach enqueue")}
+ if h.mu.TryLock(){h.mu.Unlock();t.Fatal("snapshot enqueue lost lifecycle serialization")}
+ joined := make(chan error,1)
+ go func(){_,err:=h.joinNetwork("192.0.2.1",alice);joined<-err}()
+ unblock()
+ select{case <-finished:case <-time.After(5*time.Second):t.Fatal("old notification did not finish")}
+ select{case err:=<-joined:if err!=nil{t.Fatal(err)};case <-time.After(5*time.Second):t.Fatal("join did not finish")}
+ h.notifyRosters(room)
+ if len(bob.send)!=2{t.Fatalf("frames=%d, want2",len(bob.send))}
+ first,last:=<-bob.send,<-bob.send
+ t.Logf("fixed enqueue order: first=%+v, last=%+v",first.Peers,last.Peers)
+ if len(first.Peers)!=0 || len(last.Peers)!=1 || last.Peers[0].ID!=alice.ID {t.Fatal("old snapshot overtook new roster")}
+}
+
+func TestScheduledDepartureCannotOvertakeCodeRoomMembership(t *testing.T) {
+ h := NewHub(DefaultLimits(),nil)
+ alice,bob:=newPeer("alice",""),newPeer("bob","")
+ lobby,err:=h.joinNetwork("192.0.2.1",alice)
+ if err!=nil{t.Fatal(err)}
+ if _,err:=h.joinNetwork("192.0.2.1",bob);err!=nil{t.Fatal(err)}
+ code,err:=h.createRoomForPeer("192.0.2.1",alice)
+ if err!=nil{t.Fatal(err)}
+ captured,resume:=make(chan struct{}),make(chan struct{})
+ var pause,release sync.Once
+ unblock:=func(){release.Do(func(){close(resume)})};defer unblock()
+ beforeRosterEnqueueForTest=func(p *Peer,msg *serverMessage){
+  if p==bob && msg.Type==msgPeerLeft && msg.PeerID==alice.ID{pause.Do(func(){close(captured);<-resume})}
+ }
+ departed:=make(chan bool,1)
+ go func(){departed<-h.departPeer(lobby,alice)}()
+ select{case <-captured:case <-time.After(5*time.Second):t.Fatal("departure did not reach enqueue")}
+ if h.mu.TryLock(){h.mu.Unlock();t.Fatal("departure enqueue lost lifecycle serialization")}
+ moved:=make(chan error,1)
+ go func(){
+  if _,err:=h.joinRoom(code.Code,"192.0.2.1",bob);err!=nil{moved<-err;return}
+  h.departPeer(lobby,bob);h.notifyRosters(code);moved<-nil
+ }()
+ unblock()
+ select{case empty:=<-departed:if empty{t.Fatal("unexpected retired lobby")};case <-time.After(5*time.Second):t.Fatal("departure did not finish")}
+ select{case err:=<-moved:if err!=nil{t.Fatal(err)};case <-time.After(5*time.Second):t.Fatal("scope change did not finish")}
+ if len(bob.send)!=3{t.Fatalf("frames=%d, want3",len(bob.send))}
+ left,old,last:=<-bob.send,<-bob.send,<-bob.send
+ t.Logf("fixed enqueue order: %s, %s peers=%+v, %s peers=%+v",left.Type,old.Type,old.Peers,last.Type,last.Peers)
+ if left.Type!=msgPeerLeft || old.Type!=msgRoster || len(old.Peers)!=0 || last.Type!=msgRoster || len(last.Peers)!=1 || last.Peers[0].ID!=alice.ID || last.Peers[0].Source!=roomKindCode{t.Fatal("old departure overtook code-room roster")}
+}

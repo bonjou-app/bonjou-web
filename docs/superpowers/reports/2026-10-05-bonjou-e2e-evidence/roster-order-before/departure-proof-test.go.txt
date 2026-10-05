@@ -1,0 +1,40 @@
+
+func TestRegressionLateLobbyDepartureCannotDropCurrentCodeRoomPeer(t *testing.T) {
+ h := NewHub(DefaultLimits(), nil)
+ alice, bob := newPeer("alice", ""), newPeer("bob", "")
+ lobby, err := h.joinNetwork("192.0.2.1", alice)
+ if err != nil { t.Fatal(err) }
+ if _, err := h.joinNetwork("192.0.2.1", bob); err != nil { t.Fatal(err) }
+ code, err := h.createRoomForPeer("192.0.2.1", alice)
+ if err != nil { t.Fatal(err) }
+ h.removePeer(lobby, alice)
+ captured, resume, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
+ var pause, release sync.Once
+ unblock := func() { release.Do(func() { close(resume) }) }
+ defer unblock()
+ beforeRosterEnqueueForTest = func(p *Peer, msg *serverMessage) {
+  if p == bob && msg.Type == msgPeerLeft && msg.PeerID == alice.ID {
+   pause.Do(func() { close(captured); <-resume })
+  }
+ }
+ go func() { lobby.Broadcast(&serverMessage{Type:msgPeerLeft,PeerID:alice.ID}); close(finished) }()
+ select { case <-captured: case <-time.After(5*time.Second): t.Fatal("old departure did not reach its enqueue boundary") }
+ if _, err := h.joinRoom(code.Code,"192.0.2.1",bob); err != nil { t.Fatal(err) }
+ h.removePeer(lobby,bob)
+ code.NotifyRosters()
+ unblock()
+ select { case <-finished: case <-time.After(5*time.Second): t.Fatal("old departure did not finish") }
+ lobby.NotifyRosters()
+ if _, reachable := bob.Find(alice.ID); !reachable { t.Fatal("test peers should still share their code room") }
+ var frames []*serverMessage
+ for {
+  select {
+  case msg := <-bob.send: frames=append(frames,msg)
+  default:
+   if len(frames) != 2 { t.Fatalf("got %d frames, want 2",len(frames)) }
+   t.Logf("enqueue order: %s with peers=%+v, then %s for peer=%s",frames[0].Type,frames[0].Peers,frames[1].Type,frames[1].PeerID)
+   if frames[len(frames)-1].Type == msgPeerLeft { t.Fatal("late former-lobby peer_left drops a currently reachable code-room peer without a corrective roster") }
+   return
+  }
+ }
+}

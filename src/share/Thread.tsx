@@ -1,8 +1,30 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowRightLeft, ChevronLeft, ShieldCheck } from "lucide-react";
+import { ArrowsLeftRight as ArrowRightLeft } from "@phosphor-icons/react/dist/csr/ArrowsLeftRight";
+import { CaretLeft as ChevronLeft } from "@phosphor-icons/react/dist/csr/CaretLeft";
+import { ShieldCheck } from "@phosphor-icons/react/dist/csr/ShieldCheck";
 
+import { CopyButton } from "@/components/interior/copy-button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import type { ConnectionStatus } from "./coordinator";
+import { NewItemsPill } from "@/components/interior/new-items-pill";
+import { Button } from "@/components/ui/button";
+import { Card, CardFooter, CardHeader } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty";
 import { IncomingRow, MessageRow, OutgoingRow } from "./EventRow";
 import { FileIcon } from "./FileIcon";
+import { BrandArtwork } from "./BrandArtwork";
 import { formatBytes } from "./transfer";
 import {
   EVERYONE,
@@ -27,12 +49,29 @@ interface ThreadProps {
   onVerify: () => void;
   onHistory: () => void;
   onBack: () => void;
+  peerCount: number;
+  candidateCount: number;
+  status: ConnectionStatus;
+  code: string;
+  onRoom: () => void;
+  onRetry: () => void;
+  verified: boolean;
+  unavailable?: boolean;
+  onChooseRecipient?: () => void;
 }
 
 /** Rows are events, except consecutive outgoing items of one fan-out. */
 type Row =
-  | { key: string; kind: "message"; event: Extract<ThreadEvent, { kind: "message" }> }
-  | { key: string; kind: "incoming"; event: Extract<ThreadEvent, { kind: "incoming" }> }
+  | {
+      key: string;
+      kind: "message";
+      event: Extract<ThreadEvent, { kind: "message" }>;
+    }
+  | {
+      key: string;
+      kind: "incoming";
+      event: Extract<ThreadEvent, { kind: "incoming" }>;
+    }
   | { key: string; kind: "outgoing"; items: OutgoingItem[] };
 
 export function Thread(props: ThreadProps) {
@@ -49,8 +88,24 @@ export function Thread(props: ThreadProps) {
     onVerify,
     onHistory,
     onBack,
+    peerCount,
+    candidateCount,
+    status,
+    code,
+    onRoom,
+    onRetry,
+    verified,
+    unavailable = false,
+    onChooseRecipient,
   } = props;
 
+  const [connectionSlow, setConnectionSlow] = useState(false);
+  useEffect(() => {
+    setConnectionSlow(false);
+    if (peerCount || !candidateCount) return;
+    const timer = setTimeout(() => setConnectionSlow(true), 15_000);
+    return () => clearTimeout(timer);
+  }, [peerCount, candidateCount]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pinnedRef = useRef(true);
   const previousCount = useRef(0);
@@ -132,16 +187,36 @@ export function Thread(props: ThreadProps) {
   const body =
     threadId === "received" ? (
       received.length === 0 ? (
-        <p className="empty">
-          Files you accept are listed here for this session. Your browser saves
-          the file itself to its downloads folder.
-        </p>
+        <Empty className="thread-empty max-w-md flex-none gap-4">
+          <EmptyHeader>
+            <EmptyMedia className="empty-artwork">
+              <BrandArtwork
+                kind="received"
+                sizes="(max-width: 860px) 128px, 160px"
+              />
+            </EmptyMedia>
+            <EmptyTitle
+              role="heading"
+              aria-level={3}
+              className="text-[1.75rem] leading-tight font-medium tracking-[-.04em] max-w-[22rem]"
+            >
+              Your received files, all together
+            </EmptyTitle>
+            <EmptyDescription>
+              Files you accept will appear here. Check your browser&rsquo;s
+              downloads to find or save them.
+            </EmptyDescription>
+          </EmptyHeader>
+          <p className="empty-note">This list lasts until you close the tab.</p>
+        </Empty>
       ) : (
-        <ul className="rows">
+        <ul className="rows" aria-label="Conversation events">
           {received.map((item) => (
             <li className="row" key={item.requestId}>
               <div className="row-meta">
-                <span className="row-who">{labels[item.from] ?? item.fromName}</span>
+                <span className="row-who">
+                  {labels[item.from] ?? item.fromName}
+                </span>
                 <time dateTime={new Date(item.at).toISOString()}>
                   {new Date(item.at).toLocaleTimeString([], {
                     hour: "2-digit",
@@ -149,8 +224,8 @@ export function Thread(props: ThreadProps) {
                   })}
                 </time>
               </div>
-              <div className="card is-done">
-                <div className="card-head">
+              <Card className="card is-done">
+                <CardHeader className="card-head flex items-center gap-3">
                   <span className="card-icon">
                     <FileIcon
                       name={item.name}
@@ -160,26 +235,113 @@ export function Thread(props: ThreadProps) {
                   </span>
                   <span className="card-name">{item.name}</span>
                   <span className="card-size">{formatBytes(item.size)}</span>
-                </div>
-                <div className="card-foot">
-                  <span className="card-state">Saved to your downloads</span>
-                  {item.path ? (
-                    <span className={`path-tag is-${item.path}`}>{item.path}</span>
-                  ) : null}
-                </div>
-              </div>
+                </CardHeader>
+                <CardFooter className="card-foot justify-between gap-3">
+                  <span className="card-state">
+                    Transfer complete. Check your downloads.
+                  </span>
+                </CardFooter>
+              </Card>
             </li>
           ))}
         </ul>
       )
     ) : rows.length === 0 ? (
-      <p className="empty">
-        Nothing here yet. Whatever you send goes to
-        {threadId === EVERYONE ? " everyone reachable" : ` ${title}`} and to
-        nobody else.
-      </p>
+      <Empty className="thread-empty max-w-md flex-none gap-4">
+        <EmptyHeader>
+          <EmptyMedia className="empty-artwork">
+            <BrandArtwork
+              kind={threadId === EVERYONE ? "nearby" : "notes"}
+              sizes="(max-width: 860px) 128px, 160px"
+            />
+          </EmptyMedia>
+          <EmptyTitle
+            role="heading"
+            aria-level={3}
+            className="text-[1.75rem] leading-tight font-medium tracking-[-.04em] max-w-[22rem]"
+          >
+            {threadId === EVERYONE
+              ? peerCount > 0
+                ? "A little closer. A lot easier."
+                : code
+                  ? "Your room is ready."
+                  : "Share something with someone nearby."
+              : unavailable
+                ? `Waiting for ${title}`
+                : `Say hello to ${title}`}
+          </EmptyTitle>
+          <EmptyDescription>
+            {threadId === EVERYONE
+              ? peerCount > 0
+                ? `You’re connected to ${peerCount === 1 ? "one person" : `${peerCount} people`}. Say hello or choose a file below.`
+                : code
+                  ? "Invite someone on your Wi-Fi with your room code. You can start sharing as soon as they join."
+                  : "Open Bonjou on another device using the same Wi-Fi. They’ll appear here when a direct connection is ready."
+              : unavailable
+                ? "This conversation stays here while they are disconnected. You can wait for them or choose someone else."
+                : "Messages and file offers in this conversation go only to this person."}
+          </EmptyDescription>
+        </EmptyHeader>
+        {threadId === EVERYONE && peerCount === 0 ? (
+          <>
+            <div className="empty-actions">
+              <CopyButton
+                value={`${window.location.origin}${code ? `/r/${code}` : "/app"}`}
+                label={code ? "Copy room link" : "Copy app link"}
+                className="h-11 px-5"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 px-5"
+                onClick={onRoom}
+              >
+                {code ? "Show room code" : "Create or join a room"}
+              </Button>
+            </div>
+            <p className="connection-note" role="status">
+              {status === "reconnecting" || status === "closed"
+                ? "Connection lost. Trying again…"
+                : connectionSlow
+                  ? "A nearby device was found, but the direct connection has not opened."
+                  : status !== "connected"
+                    ? "Connecting to Bonjou…"
+                    : "Ready. Keep this tab open."}
+            </p>
+            <Accordion
+              type="single"
+              collapsible
+              className="connection-help w-full max-w-sm text-left"
+            >
+              <AccordionItem value="help" className="border-0">
+                <AccordionTrigger className="justify-center gap-2 text-sm">
+                  Not seeing the other device?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm leading-relaxed">
+                  <p>
+                    Check that both devices use the same Wi-Fi and have Bonjou
+                    open. Guest Wi-Fi, VPNs, or local-network permissions can
+                    prevent a direct connection. A room code cannot bypass a
+                    blocked network.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4 h-11"
+                    onClick={onRetry}
+                  >
+                    Try connecting again
+                  </Button>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </>
+        ) : (
+          <p className="empty-note">Every file is theirs to accept.</p>
+        )}
+      </Empty>
     ) : (
-      <ul className="rows">
+      <ul className="rows" aria-label="Conversation events">
         {rows.map((row) => {
           if (row.kind === "message") {
             return (
@@ -201,7 +363,9 @@ export function Thread(props: ThreadProps) {
               />
             );
           }
-          return <OutgoingRow key={row.key} items={row.items} labels={labels} />;
+          return (
+            <OutgoingRow key={row.key} items={row.items} labels={labels} />
+          );
         })}
       </ul>
     );
@@ -209,17 +373,30 @@ export function Thread(props: ThreadProps) {
   return (
     <section className="thread" aria-label={title}>
       <header className="thread-head">
-        <button
+        <Button
           type="button"
-          className="icon-btn thread-back"
+          variant="ghost"
+          size="icon"
+          className="thread-back size-11 hidden max-[860px]:inline-flex"
           onClick={onBack}
           aria-label="Back to the list"
         >
-          <ChevronLeft size={17} strokeWidth={1.75} aria-hidden="true" />
-        </button>
+          <ChevronLeft
+            size={18}
+            className="size-[1.125rem]"
+            aria-hidden="true"
+          />
+        </Button>
 
         <div className="thread-title">
-          <h2>{title}</h2>
+          <div className="flex items-center gap-2">
+            <h2>{title}</h2>
+            {verified ? (
+              <Badge variant="outline" className="text-[var(--bj-live)]">
+                Verified
+              </Badge>
+            ) : null}
+          </div>
           <p>{subtitle}</p>
         </div>
 
@@ -230,46 +407,75 @@ export function Thread(props: ThreadProps) {
             fit across 390px.
           */}
           {canVerify ? (
-            <button
+            <Button
               type="button"
-              className="btn-tool"
+              variant="ghost"
+              className="h-11 px-3"
               onClick={onVerify}
               aria-label="Verify security fingerprint"
             >
-              <ShieldCheck size={14} strokeWidth={1.75} aria-hidden="true" />
-              <span>Verify</span>
-            </button>
+              <ShieldCheck
+                size={18}
+                className="size-[1.125rem]"
+                aria-hidden="true"
+              />
+              <span>{verified ? "Verified" : "Verify"}</span>
+            </Button>
           ) : null}
-          <button
+          <Button
             type="button"
-            className="btn-tool"
+            variant="ghost"
+            className="h-11 px-3"
             onClick={onHistory}
             aria-label="This session's transfers"
           >
-            <ArrowRightLeft size={14} strokeWidth={1.75} aria-hidden="true" />
+            <ArrowRightLeft
+              size={18}
+              className="size-[1.125rem]"
+              aria-hidden="true"
+            />
             <span>Transfers</span>
-          </button>
+          </Button>
         </div>
       </header>
 
+      {unavailable ? (
+        <div className="thread-unavailable">
+          <p role="status">
+            {title} is no longer connected. Your draft and prepared files are
+            still on this device.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 shrink-0 px-4"
+            onClick={onChooseRecipient}
+          >
+            Choose another recipient
+          </Button>
+        </div>
+      ) : null}
+
       <div className="thread-scroll">
-        <div className="thread-body bj-scroll" ref={scrollRef} onScroll={onScroll}>
+        <div
+          className="thread-body bj-scroll"
+          ref={scrollRef}
+          onScroll={onScroll}
+          tabIndex={0}
+          role="region"
+          aria-label={
+            threadId === "received" ? "Received files" : `${title} conversation`
+          }
+        >
           {body}
         </div>
 
-        {adrift ? (
-          <button
-            type="button"
-            className={missed > 0 ? "jump has-missed" : "jump"}
-            onClick={() => jumpToNewest()}
-            aria-label={
-              missed > 0 ? `Jump to ${missed} new items` : "Jump to the newest"
-            }
-          >
-            <ArrowDown size={15} strokeWidth={1.75} aria-hidden="true" />
-            {missed > 0 ? <span>{missed}</span> : null}
-          </button>
-        ) : null}
+        <NewItemsPill
+          count={missed}
+          visible={adrift}
+          onJump={() => jumpToNewest()}
+          className={missed > 0 ? "jump has-missed" : "jump"}
+        />
       </div>
     </section>
   );

@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
  *
  * Keyed by the peer's public key, never by name or peer id. That is the
  * whole point: the record is a statement about a key, so if a hostile
- * relay ever substitutes a different one, the confirmation silently stops
+ * coordinator ever substitutes a different one, the confirmation silently stops
  * applying and the mark disappears rather than vouching for a stranger.
  *
  * This is the browser's small version of what the terminal client does

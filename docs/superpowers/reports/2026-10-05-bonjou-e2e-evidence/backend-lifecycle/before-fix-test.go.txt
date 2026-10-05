@@ -1,0 +1,19 @@
+package relay
+
+import "testing"
+
+func TestRegressionLastPeerRemovalDoesNotOrphanJoiningPeer(t *testing.T) {
+ h := NewHub(DefaultLimits(), nil)
+ a, b := newPeer("a", ""), newPeer("b", "")
+ room, err := h.NetworkRoom("192.0.2.1")
+ if err != nil { t.Fatal(err) }
+ if err := room.Add(a); err != nil { t.Fatal(err) }
+ if !room.Remove(a) { t.Fatal("last removal did not report empty") }
+ joining, err := h.NetworkRoom("192.0.2.1")
+ if err != nil { t.Fatal(err) }
+ if err := joining.Add(b); err != nil { t.Fatal(err) }
+ h.Drop(room.Key)
+ discovered, err := h.NetworkRoom("192.0.2.1")
+ if err != nil { t.Fatal(err) }
+ if discovered != joining { t.Fatal("last-peer cleanup orphaned the joined peer's network room") }
+}

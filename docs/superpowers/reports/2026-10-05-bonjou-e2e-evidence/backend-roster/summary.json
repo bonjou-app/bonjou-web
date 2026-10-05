@@ -1,0 +1,91 @@
+{
+  "race": {
+    "command": "go test -race -count=1 -json ./...",
+    "baseline_head": "513c0eda8bccf9ba48d5f420a415711d7e9ba1aa",
+    "tested_source_sha256": {
+      "internal/relay/room.go": "2fabc1c531a4d20dfb0c2e496e12d9740e359de5cfd5b317f38873b08550633b",
+      "internal/relay/conn.go": "efd7e293688d50056b832ae1b0445573ca519950ef6f21823e55254cb6c513c4",
+      "internal/relay/room_test.go": "8e299717a18f990ac95eff738ddb1fa21398cfd416b4cf5900fc42e974d4f1ab"
+    },
+    "exit_code": 0,
+    "seconds": 5.0,
+    "passed_test_events": 163,
+    "passed_top_level_tests": 123,
+    "top_level_test_events": 124,
+    "skipped_tests": [
+      {
+        "package": "github.com/bonjou-app/bonjou-cli/internal/commands",
+        "test": "TestUnescapeShellPathLeavesWindowsSeparatorsAlone"
+      }
+    ],
+    "tested_packages": [
+      "github.com/bonjou-app/bonjou-cli/internal/relay",
+      "github.com/bonjou-app/bonjou-cli/internal/ui",
+      "github.com/bonjou-app/bonjou-cli/internal/queue",
+      "github.com/bonjou-app/bonjou-cli/internal/network",
+      "github.com/bonjou-app/bonjou-cli/internal/commands"
+    ],
+    "failures": [],
+    "log": "/tmp/bonjou-backend-roster-2026-10-05/race.jsonl",
+    "stderr": "/tmp/bonjou-backend-roster-2026-10-05/race.stderr.log"
+  },
+  "vet": {
+    "command": "go vet ./...",
+    "exit_code": 0,
+    "seconds": 1.27,
+    "log": "/tmp/bonjou-backend-roster-2026-10-05/vet.log"
+  },
+  "lint": {
+    "command": "golangci-lint run ./...",
+    "exit_code": 0,
+    "seconds": 2.26,
+    "log": "/tmp/bonjou-backend-roster-2026-10-05/lint.log"
+  },
+  "gofmt": {
+    "command": "gofmt -l <all tracked Go files>",
+    "exit_code": 0,
+    "tracked_go_files": 63,
+    "unformatted": [],
+    "log": "/tmp/bonjou-backend-roster-2026-10-05/gofmt.log"
+  },
+  "fixed_exact_enqueue_proof": {
+    "baseline_head": "513c0eda8bccf9ba48d5f420a415711d7e9ba1aa",
+    "tested_source_sha256": {
+      "internal/relay/room.go": "2fabc1c531a4d20dfb0c2e496e12d9740e359de5cfd5b317f38873b08550633b",
+      "internal/relay/conn.go": "efd7e293688d50056b832ae1b0445573ca519950ef6f21823e55254cb6c513c4",
+      "internal/relay/room_test.go": "8e299717a18f990ac95eff738ddb1fa21398cfd416b4cf5900fc42e974d4f1ab"
+    },
+    "isolated_checkout": "/var/folders/34/kfd6g6cx03ld5vvtz45l8s6c0000gn/T/bonjou-fixed-roster-scheduling-p9bkjvxc",
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "./internal/relay",
+      "-run",
+      "^TestScheduled",
+      "-count=1",
+      "-v"
+    ],
+    "exit_code": 0,
+    "hook": "Test-only pause at actual Peer.Send entry, after snapshot or departed-recipient selection; no hook in product source.",
+    "log": "/tmp/bonjou-backend-roster-2026-10-05/fixed-scheduling-proof.log"
+  },
+  "baseline_repros": {
+    "head": "513c0eda8bccf9ba48d5f420a415711d7e9ba1aa",
+    "roster_log": "/tmp/bonjou-stale-roster-2026-10-05/proof.log",
+    "departure_log": "/tmp/bonjou-stale-roster-2026-10-05/departure-proof.log",
+    "expected_exit_code": 1,
+    "scope": "Test-only scheduling barriers in isolated copies; no browser failure cause established."
+  },
+  "new_production_test_names": [
+    "TestHubRosterRefreshIsOrderedWithMembership",
+    "TestHubRosterNotificationRejectsRetiredRoom",
+    "TestHubDepartureNotifiesOnlyCurrentScope",
+    "TestHubDepartureCannotOvertakeScopeChange"
+  ],
+  "modified_files": [
+    "internal/relay/room.go",
+    "internal/relay/conn.go",
+    "internal/relay/room_test.go"
+  ]
+}

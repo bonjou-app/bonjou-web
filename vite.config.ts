@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
@@ -32,7 +33,8 @@ type Middleware = (
 ) => void;
 
 export default defineConfig({
-  plugins: [react(), rewrites()],
+  plugins: [react(), tailwindcss(), rewrites()],
+  resolve: { alias: { "@": entry("src") } },
   build: {
     // Preserve Vite 6's syntax targets across the bundler upgrade.
     target: ["es2020", "chrome87", "edge88", "firefox78", "safari14"],

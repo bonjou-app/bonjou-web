@@ -1,0 +1,44 @@
+package relay
+
+import (
+ "sync"
+ "testing"
+ "time"
+)
+
+func TestRegressionNotifyRostersCannotOverwriteNewRosterWithOldSnapshot(t *testing.T) {
+ h := NewHub(DefaultLimits(), nil)
+ bob, alice := newPeer("bob", ""), newPeer("alice", "")
+ room, err := h.joinNetwork("192.0.2.1", bob)
+ if err != nil { t.Fatal(err) }
+ captured, resume, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
+ var pause, release sync.Once
+ unblock := func() { release.Do(func() { close(resume) }) }
+ defer unblock()
+ beforeRosterEnqueueForTest = func(p *Peer, msg *serverMessage) {
+  if p == bob && msg.Type == msgRoster && len(msg.Peers) == 0 {
+   pause.Do(func() { close(captured); <-resume })
+  }
+ }
+ go func() { room.NotifyRosters(); close(finished) }()
+ select { case <-captured: case <-time.After(5*time.Second): t.Fatal("old roster did not reach its enqueue boundary") }
+ if _, err := h.joinNetwork("192.0.2.1", alice); err != nil { t.Fatal(err) }
+ room.NotifyRosters()
+ unblock()
+ select { case <-finished: case <-time.After(5*time.Second): t.Fatal("old notification did not finish") }
+ var rosters []*serverMessage
+ for {
+  select {
+  case msg := <-bob.send:
+   if msg.Type == msgRoster { rosters=append(rosters,msg) }
+  default:
+   if len(rosters) != 2 { t.Fatalf("got %d rosters, want 2",len(rosters)) }
+   t.Logf("enqueue order: first roster=%+v, final roster=%+v",rosters[0].Peers,rosters[1].Peers)
+   last := rosters[len(rosters)-1]
+   if len(last.Peers) != 1 || last.Peers[0].ID != alice.ID {
+    t.Fatal("older NotifyRosters snapshot overwrote the current live member")
+   }
+   return
+  }
+ }
+}

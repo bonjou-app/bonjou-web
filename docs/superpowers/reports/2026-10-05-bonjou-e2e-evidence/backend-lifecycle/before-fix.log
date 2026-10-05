@@ -1,0 +1,5 @@
+--- FAIL: TestRegressionLastPeerRemovalDoesNotOrphanJoiningPeer (0.00s)
+    room_retirement_regression_test.go:18: last-peer cleanup orphaned the joined peer's network room
+FAIL
+FAIL	github.com/bonjou-app/bonjou-cli/internal/relay	1.090s
+FAIL

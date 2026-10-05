@@ -1,0 +1,5 @@
+locator.waitFor: Timeout 20000ms exceeded.
+Call log:
+  - waiting for getByText('Bob', { exact: true }).first() to be visible
+
+    at main (/home/runner/work/bonjou-web/bonjou-web/scripts/e2e-lan.mjs:85:8)

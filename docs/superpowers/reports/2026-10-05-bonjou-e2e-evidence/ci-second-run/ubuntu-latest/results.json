@@ -1,0 +1,45 @@
+{
+  "origin": "http://127.0.0.1:4173",
+  "results": [
+    {
+      "name": "ui-chromium",
+      "logFile": "ui-chromium-1.log",
+      "started": "2026-10-05T05:57:06.252Z",
+      "durationSeconds": 16.74,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "motion-chromium",
+      "logFile": "motion-chromium-1.log",
+      "started": "2026-10-05T05:57:22.989Z",
+      "durationSeconds": 11.73,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-chromium",
+      "logFile": "lan-chromium-1.log",
+      "started": "2026-10-05T05:57:34.724Z",
+      "durationSeconds": 10.19,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "experience-chromium",
+      "logFile": "experience-chromium-1.log",
+      "started": "2026-10-05T05:57:44.916Z",
+      "durationSeconds": 16.72,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "workflows-chromium",
+      "logFile": "workflows-chromium-1.log",
+      "started": "2026-10-05T05:58:01.639Z",
+      "durationSeconds": 38.07,
+      "code": 1,
+      "signal": null
+    }
+  ]
+}

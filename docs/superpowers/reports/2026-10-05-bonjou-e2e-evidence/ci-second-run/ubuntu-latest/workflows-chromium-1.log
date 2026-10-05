@@ -1,0 +1,17 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('.chip').filter({ hasText: 'Unsupported downloads' })
+
+    at select (/home/runner/work/bonjou-web/bonjou-web/scripts/e2e-workflows.mjs:41:57)
+    at /home/runner/work/bonjou-web/bonjou-web/scripts/e2e-workflows.mjs:217:11 {
+  log: [
+    "  - waiting for locator('.chip').filter({ hasText: 'Unsupported downloads' })"
+  ],
+  name: 'TimeoutError'
+}
+
+Node.js v24.21.0

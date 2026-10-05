@@ -1,5 +1,14 @@
-import { ExternalLink } from "lucide-react";
+import { ArrowSquareOut as ExternalLink } from "@phosphor-icons/react/dist/csr/ArrowSquareOut";
 
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 import { Logo } from "./Logo";
 
 /**
@@ -15,10 +24,12 @@ import { Logo } from "./Logo";
  */
 export function TabTaken({ onTakeOver }: { onTakeOver: () => void }) {
   return (
-    <div className="gate">
+    <main className="gate">
       <div className="gate-bar">
-        <Logo size={16} />
-        <span className="gate-brand">bonjou</span>
+        <a href="/" className="gate-home" aria-label="Bonjou home">
+          <Logo size={20} />
+          <span className="gate-brand">bonjou</span>
+        </a>
         <span className="spacer" />
         <span className="gate-status">
           <span className="blip is-closed" aria-hidden="true" />
@@ -26,32 +37,39 @@ export function TabTaken({ onTakeOver }: { onTakeOver: () => void }) {
         </span>
       </div>
 
-      <div className="gate-body">
-        <p className="bj-label is-accent">Already open</p>
-        <h1>
-          Bonjou is running
-          <br />
-          in another tab.
-        </h1>
-        <p className="gate-lede">
-          Only one tab connects at a time. Two would put you on everyone
-          else&rsquo;s list twice, and they have no way of telling that both
-          are you.
-        </p>
+      <Card className="gate-body w-[calc(100%-2rem)] max-w-md self-center justify-self-center my-12 [--card-spacing:--spacing(7)] shadow-sm">
+        <CardHeader className="gap-3">
+          <CardTitle>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Bonjou is running
+              <br />
+              in another tab.
+            </h1>
+          </CardTitle>
+          <CardDescription className="leading-relaxed">
+            Your session is active in another tab. Switch it here to keep
+            chatting and sharing in this window.
+          </CardDescription>
+        </CardHeader>
 
-        <div className="gate-actions">
-          <button type="button" className="btn-accent is-large" onClick={onTakeOver}>
-            <ExternalLink size={14} strokeWidth={1.75} aria-hidden="true" />
+        <CardContent>
+          <Button type="button" className="h-11 w-full" onClick={onTakeOver}>
+            <ExternalLink
+              size={18}
+              className="size-[1.125rem]"
+              aria-hidden="true"
+            />
             Use it in this tab
-          </button>
-        </div>
+          </Button>
+        </CardContent>
 
-        <p className="gate-note">
-          The other tab keeps your conversation and drops its connection.
-          Nothing in flight is lost, because nothing is stored on a server
-          either way.
-        </p>
-      </div>
-    </div>
+        <CardFooter>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Switching disconnects the other tab. Finish any active file
+            transfers before you switch.
+          </p>
+        </CardFooter>
+      </Card>
+    </main>
   );
 }

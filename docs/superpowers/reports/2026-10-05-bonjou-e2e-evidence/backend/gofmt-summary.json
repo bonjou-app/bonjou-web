@@ -1,0 +1,8 @@
+{
+  "command": "gofmt -l <all tracked Go files>",
+  "head": "2e96dbf059a2727cd7e1e54381a8146dae43d497",
+  "exit_code": 0,
+  "tracked_go_files": 63,
+  "unformatted": [],
+  "log": "/tmp/bonjou-backend-e2e-2026-10-05/gofmt.log"
+}

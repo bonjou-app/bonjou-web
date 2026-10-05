@@ -1,17 +1,32 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowDownToLine,
-  Command as CommandIcon,
-  Copy,
-  Moon,
-  Radio,
-  Search,
-  Settings,
-  Sun,
-} from "lucide-react";
+import { DownloadSimple as ArrowDownToLine } from "@phosphor-icons/react/dist/csr/DownloadSimple";
+import { Command as CommandIcon } from "@phosphor-icons/react/dist/csr/Command";
+import { Copy } from "@phosphor-icons/react/dist/csr/Copy";
+import { Moon } from "@phosphor-icons/react/dist/csr/Moon";
+import { Broadcast as Radio } from "@phosphor-icons/react/dist/csr/Broadcast";
+import { MagnifyingGlass as Search } from "@phosphor-icons/react/dist/csr/MagnifyingGlass";
+import { GearSix as Settings } from "@phosphor-icons/react/dist/csr/GearSix";
+import { Sun } from "@phosphor-icons/react/dist/csr/Sun";
+import { Ticket } from "@phosphor-icons/react/dist/csr/Ticket";
 
+import { useCopyToClipboard } from "@/components/interior/copy-button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Logo } from "./Logo";
-import type { ConnectionStatus, Peer } from "./relay";
+import type { ConnectionStatus, Peer } from "./coordinator";
 import { EVERYONE } from "./useSession";
 import type { ResolvedTheme } from "./theme";
 import { usePlatform } from "./usePlatform";
@@ -36,11 +51,11 @@ interface RailProps {
 }
 
 const STATUS_TEXT: Record<ConnectionStatus, string> = {
-  idle: "starting",
-  connecting: "connecting",
-  connected: "on air",
-  reconnecting: "reconnecting",
-  closed: "offline",
+  idle: "Starting",
+  connecting: "Connecting",
+  connected: "Connected",
+  reconnecting: "Reconnecting",
+  closed: "Offline",
 };
 
 export function Rail(props: RailProps) {
@@ -70,7 +85,9 @@ export function Rail(props: RailProps) {
   // long. Ignored while already typing, or the character never arrives.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (searchRef.current?.closest("[hidden]")) return;
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey)
+        return;
       const target = event.target as HTMLElement | null;
       if (
         target &&
@@ -104,96 +121,136 @@ export function Rail(props: RailProps) {
   const noMatches = Boolean(needle) && wifi.length === 0 && room.length === 0;
 
   const { isMac, isMobile } = usePlatform();
+  const { copy } = useCopyToClipboard({ onCopy: onCopyLink });
 
   return (
     <aside className="rail" aria-label="Conversations">
       <div className="rail-brand">
-        <Logo size={17} />
-        <span className="rail-name">bonjou</span>
-        <span className="wordmark-tag">web</span>
+        <a href="/" className="gate-home" aria-label="Bonjou home">
+          <Logo size={20} />
+          <span className="rail-name">bonjou</span>
+        </a>
+        <Badge variant="secondary">web</Badge>
         <span className="spacer" />
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={onToggleTheme}
-          aria-label={theme === "dark" ? "Switch to light" : "Switch to dark"}
-        >
-          {theme === "dark" ? (
-            <Sun size={13} strokeWidth={1.75} aria-hidden="true" />
-          ) : (
-            <Moon size={13} strokeWidth={1.75} aria-hidden="true" />
-          )}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-11"
+              onClick={onToggleTheme}
+              aria-label={
+                theme === "dark" ? "Switch to light" : "Switch to dark"
+              }
+            >
+              {theme === "dark" ? (
+                <Sun size={18} className="size-[1.125rem]" aria-hidden="true" />
+              ) : (
+                <Moon
+                  size={18}
+                  className="size-[1.125rem]"
+                  aria-hidden="true"
+                />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {theme === "dark" ? "Light theme" : "Dark theme"}
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       <div className="rail-status">
         <span className={`blip is-${status}`} aria-hidden="true" />
         <span className={`rail-live is-${status}`}>{STATUS_TEXT[status]}</span>
-        <span className="rail-sep">·</span>
-        <span className="rail-count">
-          {peers.length} reachable
-        </span>
+        <Separator
+          orientation="vertical"
+          className="rail-sep h-3!"
+          aria-hidden="true"
+        />
+        <span className="rail-count">{peers.length} reachable</span>
         <span className="spacer" />
-        <button
+        <Button
           type="button"
-          className="rail-cmd"
+          variant="ghost"
+          size="xs"
+          className="rail-cmd min-h-11 min-w-11"
           onClick={onOpenPalette}
           aria-label="Open the command palette"
         >
           {isMobile ? (
-            <Search size={12} strokeWidth={1.75} aria-hidden="true" />
+            <Search size={18} className="size-[1.125rem]" aria-hidden="true" />
           ) : isMac ? (
             <>
-              <CommandIcon size={11} strokeWidth={1.75} aria-hidden="true" />
+              <CommandIcon
+                size={18}
+                className="size-[1.125rem]"
+                aria-hidden="true"
+              />
               <span>K</span>
             </>
           ) : (
             <span>Ctrl K</span>
           )}
-        </button>
+        </Button>
       </div>
 
-      <div className="rail-search">
-        <Search size={13} strokeWidth={1.75} aria-hidden="true" />
-        <input
-          ref={searchRef}
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search people"
-          aria-label="Search people"
-        />
-        <span className="bj-kbd" aria-hidden="true">
-          /
-        </span>
+      <div className="px-4 pb-6">
+        <InputGroup className="h-10 bg-background">
+          <InputGroupAddon>
+            <Search size={18} className="size-[1.125rem]" aria-hidden="true" />
+          </InputGroupAddon>
+          <InputGroupInput
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search people"
+            aria-label="Search people"
+          />
+          <InputGroupAddon align="inline-end">
+            <span className="bj-kbd" aria-hidden="true">
+              /
+            </span>
+          </InputGroupAddon>
+        </InputGroup>
       </div>
 
       <div className="rail-list bj-scroll">
-        <p className="bj-label">Rooms</p>
-        <button
+        <p className="bj-label">Conversations</p>
+        <Button
           type="button"
-          className="chip is-group"
+          variant="ghost"
+          className="chip is-group mb-1 h-12 w-full justify-start gap-3 px-3 aria-[current=true]:bg-background aria-[current=true]:shadow-xs"
           aria-current={activeId === EVERYONE}
           onClick={() => onSelect(EVERYONE)}
         >
           <span className="chip-mark" aria-hidden="true">
-            <Radio size={12} strokeWidth={1.75} />
+            <Radio size={18} />
           </span>
-          <span className="chip-name">{code ? `Room ${code}` : "Everyone here"}</span>
-          <span className="chip-tag">{peers.length}</span>
-        </button>
-        <button
+          <span className="chip-name">
+            {code ? `Room ${code}` : "Everyone here"}
+          </span>
+          <Badge variant="outline" className="chip-tag">
+            {peers.length}
+          </Badge>
+        </Button>
+        <Button
           type="button"
-          className="chip is-group"
+          variant="ghost"
+          className="chip is-group mb-1 h-12 w-full justify-start gap-3 px-3 aria-[current=true]:bg-background aria-[current=true]:shadow-xs"
           aria-current={activeId === "received"}
           onClick={() => onSelect("received")}
         >
           <span className="chip-mark" aria-hidden="true">
-            <ArrowDownToLine size={12} strokeWidth={1.75} />
+            <ArrowDownToLine size={18} />
           </span>
           <span className="chip-name">Received files</span>
-          <span className="chip-tag">{receivedCount}</span>
-        </button>
+          <Badge variant="outline" className="chip-tag">
+            {receivedCount}
+          </Badge>
+        </Button>
 
         <PeerGroup
           label="On your Wi-Fi"
@@ -214,40 +271,51 @@ export function Rail(props: RailProps) {
           tag="room"
         />
 
-        {noMatches ? <p className="rail-note">Nobody here matches that.</p> : null}
+        {noMatches ? (
+          <p className="rail-note">Nobody here matches that.</p>
+        ) : null}
 
         {peers.length === 0 && !needle ? (
-          <div className="rail-empty">
-            {status === "closed" || status === "reconnecting" ? (
-              <>
-                <p className="bj-label is-warn">Offline</p>
-                <p>
-                  Reconnecting. Anything half-sent restarts from the beginning,
-                  because nothing partial is ever kept.
-                </p>
-              </>
-            ) : networkGrouped ? (
-              <>
-                <p className="bj-label">Nobody yet</p>
-                <p>
-                  Anyone who opens this page on your Wi-Fi appears here on their
-                  own. No code, no invite.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="bj-label is-warn">Network too large</p>
-                <p>
-                  Too many devices share your network address to group them
-                  safely. A campus or carrier network can put a whole region
-                  behind one address.
-                </p>
-                <button type="button" className="btn-accent" onClick={onOpenRoom}>
-                  Open a room instead
-                </button>
-              </>
-            )}
-          </div>
+          <Alert
+            role="status"
+            className="rail-empty mt-6 border-0 bg-transparent shadow-none"
+          >
+            <AlertDescription>
+              {status === "closed" || status === "reconnecting" ? (
+                <>
+                  <p className="bj-label is-warn">Offline</p>
+                  <p>
+                    Reconnecting. Interrupted transfers need to be sent again.
+                    Check your downloads for partial files.
+                  </p>
+                </>
+              ) : networkGrouped ? (
+                <>
+                  <p className="bj-label">Waiting for people</p>
+                  <p>
+                    People appear here when they open Bonjou on the same Wi-Fi
+                    and connect to you.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="bj-label is-warn">Network too large</p>
+                  <p>
+                    Too many devices share your network address to group them
+                    safely. A campus or carrier network can put a whole region
+                    behind one address.
+                  </p>
+                  <Button
+                    type="button"
+                    className="h-10 px-4"
+                    onClick={onOpenRoom}
+                  >
+                    Open a room instead
+                  </Button>
+                </>
+              )}
+            </AlertDescription>
+          </Alert>
         ) : null}
       </div>
 
@@ -258,30 +326,63 @@ export function Rail(props: RailProps) {
           confusing target.
         */}
         <div className="rail-room">
-          <button type="button" className="rail-room-open" onClick={onOpenRoom}>
-            <span className="bj-label">Room</span>
-            <code>{code || "not open"}</code>
-          </button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="rail-room-open h-auto min-h-14 min-w-0 flex-1 justify-start gap-3 px-3 py-3 text-left"
+            onClick={onOpenRoom}
+          >
+            <Ticket size={18} className="size-[1.125rem]" aria-hidden="true" />
+            <span className="rail-room-copy">
+              <span>
+                {code ? "Your private room" : "Create or join a room"}
+              </span>
+              {code ? (
+                <code>{code}</code>
+              ) : (
+                <small>A space for a smaller group</small>
+              )}
+            </span>
+          </Button>
           {code ? (
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={onCopyLink}
-              aria-label="Copy the room link"
-            >
-              <Copy size={13} strokeWidth={1.75} aria-hidden="true" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-11"
+                  onClick={() =>
+                    void copy(`${window.location.origin}/r/${code}`)
+                  }
+                  aria-label="Copy the room link"
+                >
+                  <Copy
+                    size={18}
+                    className="size-[1.125rem]"
+                    aria-hidden="true"
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Copy room link</TooltipContent>
+            </Tooltip>
           ) : null}
         </div>
 
-        <button type="button" className="rail-me" onClick={onOpenSettings}>
-          <span className="avatar" aria-hidden="true">
-            {name.slice(0, 1).toLowerCase()}
-          </span>
+        <Button
+          type="button"
+          variant="ghost"
+          className="rail-me mt-2 h-auto min-h-14 w-full justify-start gap-3 px-3 py-2"
+          onClick={onOpenSettings}
+          aria-label="Open settings"
+        >
+          <Avatar className="size-8" size="sm" aria-hidden="true">
+            <AvatarFallback>{name.slice(0, 1).toLowerCase()}</AvatarFallback>
+          </Avatar>
           <span className="rail-me-name">{name}</span>
           <span className="spacer" />
-          <Settings size={13} strokeWidth={1.75} aria-hidden="true" />
-        </button>
+          <Settings size={18} className="size-[1.125rem]" aria-hidden="true" />
+        </Button>
       </div>
     </aside>
   );
@@ -309,25 +410,33 @@ function PeerGroup({
     <>
       <p className="bj-label is-spaced">{label}</p>
       {peers.map((peer) => (
-        <button
+        <Button
           key={peer.id}
           type="button"
-          className="chip"
+          variant="ghost"
+          className="chip mb-1 h-12 w-full justify-start gap-3 px-3 aria-[current=true]:bg-background aria-[current=true]:shadow-xs"
           aria-current={activeId === peer.id}
           onClick={() => onSelect(peer.id)}
         >
-          <span className="avatar" aria-hidden="true">
-            {(labels[peer.id] ?? peer.name).slice(0, 1).toLowerCase()}
-          </span>
+          <Avatar className="size-8" size="sm" aria-hidden="true">
+            <AvatarFallback>
+              {(labels[peer.id] ?? peer.name).slice(0, 1).toLowerCase()}
+            </AvatarFallback>
+          </Avatar>
           <span className="chip-name">{labels[peer.id] ?? peer.name}</span>
           {unread[peer.id] ? (
-            <span className="chip-tag is-unread" aria-label={`${unread[peer.id]} new`}>
+            <Badge
+              className="chip-tag is-unread"
+              aria-label={`${unread[peer.id]} new`}
+            >
               {unread[peer.id]}
-            </span>
+            </Badge>
           ) : (
-            <span className="chip-tag">{tag}</span>
+            <Badge variant="outline" className="chip-tag">
+              {tag}
+            </Badge>
           )}
-        </button>
+        </Button>
       ))}
     </>
   );

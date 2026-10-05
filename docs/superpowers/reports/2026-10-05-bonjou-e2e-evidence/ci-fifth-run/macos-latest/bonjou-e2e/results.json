@@ -1,0 +1,61 @@
+{
+  "origin": "http://127.0.0.1:4173",
+  "results": [
+    {
+      "name": "ui-webkit",
+      "logFile": "ui-webkit-1.log",
+      "started": "2026-10-05T06:49:01.612Z",
+      "durationSeconds": 53.13,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "motion-webkit",
+      "logFile": "motion-webkit-1.log",
+      "started": "2026-10-05T06:49:54.781Z",
+      "durationSeconds": 22.43,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "lan-webkit",
+      "logFile": "lan-webkit-1.log",
+      "started": "2026-10-05T06:50:17.221Z",
+      "durationSeconds": 16.46,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "experience-webkit",
+      "logFile": "experience-webkit-1.log",
+      "started": "2026-10-05T06:50:33.694Z",
+      "durationSeconds": 27.21,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "cross-browser-mixed",
+      "logFile": "cross-browser-mixed-1.log",
+      "started": "2026-10-05T06:51:00.916Z",
+      "durationSeconds": 15.36,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "boundaries-webkit",
+      "logFile": "boundaries-webkit-1.log",
+      "started": "2026-10-05T06:51:16.288Z",
+      "durationSeconds": 42.47,
+      "code": 0,
+      "signal": null
+    },
+    {
+      "name": "smoke-coordinator",
+      "logFile": "smoke-coordinator-1.log",
+      "started": "2026-10-05T06:51:58.784Z",
+      "durationSeconds": 0.31,
+      "code": 0,
+      "signal": null
+    }
+  ]
+}

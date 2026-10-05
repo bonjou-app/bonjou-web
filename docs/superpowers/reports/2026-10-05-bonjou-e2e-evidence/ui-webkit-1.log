@@ -1,0 +1,13 @@
+browserType.launch: Executable doesn't exist at /Users/hamzawahab/Library/Caches/ms-playwright/webkit-2359/pw_run.sh
+╔════════════════════════════════════════════════════════════╗
+║ Looks like Playwright was just installed or updated.       ║
+║ Please run the following command to download new browsers: ║
+║                                                            ║
+║     npx playwright install                                 ║
+║                                                            ║
+║ <3 Playwright Team                                         ║
+╚════════════════════════════════════════════════════════════╝
+    at main (/Users/hamzawahab/Developer/bonjou-web/scripts/e2e-ui.mjs:75:37) {
+  log: [],
+  name: 'Error'
+}

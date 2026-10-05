@@ -1,0 +1,121 @@
+{
+  "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+  "all_pass": true,
+  "runtime_executed": false,
+  "results": [
+    {
+      "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+      "binary": "bonjou",
+      "goos": "linux",
+      "goarch": "amd64",
+      "command": [
+        "go",
+        "build",
+        "-trimpath",
+        "-o",
+        "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-linux-amd64",
+        "./cmd/bonjou"
+      ],
+      "exit_code": 0,
+      "seconds": 0.69,
+      "sha256": "7bb3fffe5a3bfdb114d7968e75ae76537ad05777c2d69829803ad1d1bd0110fd",
+      "file": "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-linux-amd64: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, Go BuildID=ozNpyk5Uc_R6UV19g5-y/Noe94ULtxEjlno7IvXvd/bHN2qKbUSLsBs70pcLEA/0WqV1aBixIOL8MkBhQIT, BuildID[sha1]=074c0033009f293db900901e496e2881acc276fc, with debug_info, not stripped",
+      "runtime_executed": false
+    },
+    {
+      "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+      "binary": "bonjou",
+      "goos": "linux",
+      "goarch": "arm64",
+      "command": [
+        "go",
+        "build",
+        "-trimpath",
+        "-o",
+        "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-linux-arm64",
+        "./cmd/bonjou"
+      ],
+      "exit_code": 0,
+      "seconds": 0.35,
+      "sha256": "8ab6e10235a848dfd87d18c0bab0bc23960f1c5537511283644c6443e8d6268a",
+      "file": "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-linux-arm64: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, Go BuildID=Dk1iQzv2OCtT8vV1ZhUo/pOCB2_uO1WsWxiTzp1Ej/hq0hU9J21zEqmeOi7vsy/jvxZP2GcYpPpDN6-zV9G, BuildID[sha1]=60a09e017523a9579df1c68ac5a2f3f966438eb3, with debug_info, not stripped",
+      "runtime_executed": false
+    },
+    {
+      "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+      "binary": "bonjou",
+      "goos": "darwin",
+      "goarch": "arm64",
+      "command": [
+        "go",
+        "build",
+        "-trimpath",
+        "-o",
+        "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-darwin-arm64",
+        "./cmd/bonjou"
+      ],
+      "exit_code": 0,
+      "seconds": 0.31,
+      "sha256": "0a9b6b4731e207f6074a276f09be2923e39138f7050688b4acf2a2c36fb73a88",
+      "file": "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-darwin-arm64: Mach-O 64-bit executable arm64",
+      "runtime_executed": false
+    },
+    {
+      "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+      "binary": "bonjou",
+      "goos": "windows",
+      "goarch": "amd64",
+      "command": [
+        "go",
+        "build",
+        "-trimpath",
+        "-o",
+        "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-windows-amd64.exe",
+        "./cmd/bonjou"
+      ],
+      "exit_code": 0,
+      "seconds": 0.25,
+      "sha256": "b9dc42b1d1efba9f83a6264af8bad48c8eef64756b164f5463fd6b6304bbd9d1",
+      "file": "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-windows-amd64.exe: PE32+ executable (console) x86-64, for MS Windows",
+      "runtime_executed": false
+    },
+    {
+      "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+      "binary": "bonjou-relay",
+      "goos": "linux",
+      "goarch": "amd64",
+      "command": [
+        "go",
+        "build",
+        "-trimpath",
+        "-o",
+        "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-relay-linux-amd64",
+        "./cmd/bonjou-relay"
+      ],
+      "exit_code": 0,
+      "seconds": 0.32,
+      "sha256": "6e434edda966e8335686d5ade791b9db11552a7ed7593f326937d2a67e298296",
+      "file": "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-relay-linux-amd64: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, Go BuildID=RXAu9eSlQz9AN20IEZUK/mpwRp4MXIyY5IeFKLz6W/-F2TgUQYnPQYBNq7fs5A/T81T-AR3rO88Nzz2a43f, BuildID[sha1]=4caf442667afdf11616d40c603ceffb67c6ba22b, with debug_info, not stripped",
+      "runtime_executed": false
+    },
+    {
+      "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+      "binary": "bonjou-relay",
+      "goos": "linux",
+      "goarch": "arm64",
+      "command": [
+        "go",
+        "build",
+        "-trimpath",
+        "-o",
+        "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-relay-linux-arm64",
+        "./cmd/bonjou-relay"
+      ],
+      "exit_code": 0,
+      "seconds": 0.32,
+      "sha256": "2514b8d34aa5f290c3fb1471a6bac389f1dffffa943e4443940551a79a53a040",
+      "file": "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-relay-linux-arm64: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, Go BuildID=SfY5W8r389QEMqi9eskG/uQ0TJ93Dc2MQS4-PsGfA/RXHutPrcfqZCGSvLiLCB/5XlkxqKl0JSDRj1jen1Y, BuildID[sha1]=83f1f722d522579b1658b12e36ec674eb6748a0d, with debug_info, not stripped",
+      "runtime_executed": false
+    }
+  ]
+}

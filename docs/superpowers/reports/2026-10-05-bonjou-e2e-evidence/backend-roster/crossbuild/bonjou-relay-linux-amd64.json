@@ -1,0 +1,19 @@
+{
+  "head": "0e30775c9efeded215930ab46aaffaa65a8c85ea",
+  "binary": "bonjou-relay",
+  "goos": "linux",
+  "goarch": "amd64",
+  "command": [
+    "go",
+    "build",
+    "-trimpath",
+    "-o",
+    "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-relay-linux-amd64",
+    "./cmd/bonjou-relay"
+  ],
+  "exit_code": 0,
+  "seconds": 0.32,
+  "sha256": "6e434edda966e8335686d5ade791b9db11552a7ed7593f326937d2a67e298296",
+  "file": "/tmp/bonjou-roster-crossbuild-2026-10-05/bonjou-relay-linux-amd64: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, Go BuildID=RXAu9eSlQz9AN20IEZUK/mpwRp4MXIyY5IeFKLz6W/-F2TgUQYnPQYBNq7fs5A/T81T-AR3rO88Nzz2a43f, BuildID[sha1]=4caf442667afdf11616d40c603ceffb67c6ba22b, with debug_info, not stripped",
+  "runtime_executed": false
+}

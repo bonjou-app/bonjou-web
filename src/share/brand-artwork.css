@@ -1,0 +1,61 @@
+@layer bonjou {
+  .bonjou-art {
+    display: block;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    flex: none;
+  }
+  .story-art-heading {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .story-art {
+    width: 8rem;
+    height: 8rem;
+  }
+  .story-art-heading .story-context {
+    margin-bottom: 0;
+  }
+  .consent-intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(6rem, 13vw, 11rem);
+    column-gap: 0.75rem;
+    align-items: center;
+  }
+  .consent-intro > p {
+    grid-column: 1 / -1;
+  }
+  .consent-art {
+    width: 100%;
+    height: auto;
+    align-self: center;
+    transform: rotate(-8deg);
+  }
+  .thread-empty [data-slot="empty-media"].empty-artwork {
+    width: 10rem;
+    height: 10rem;
+    margin-bottom: 0;
+  }
+  .empty-artwork .bonjou-art {
+    width: 100%;
+    height: 100%;
+  }
+  @media (max-width: 860px) {
+    .thread-empty [data-slot="empty-media"].empty-artwork {
+      width: 8rem;
+      height: 8rem;
+    }
+  }
+  @media (max-width: 760px) {
+    .story-art {
+      width: 6.5rem;
+      height: 6.5rem;
+    }
+    .consent-intro {
+      grid-template-columns: minmax(0, 1fr) 6.5rem;
+    }
+  }
+}

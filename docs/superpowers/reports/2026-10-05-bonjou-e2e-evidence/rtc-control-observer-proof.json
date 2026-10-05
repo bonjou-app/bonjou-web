@@ -1,0 +1,22 @@
+{
+  "status": "pass",
+  "engine": "native Chrome",
+  "counts": [
+    {
+      "client": 1,
+      "nativeConnection": "connected",
+      "sentProfiles": 1,
+      "receivedProfiles": 1
+    },
+    {
+      "client": 2,
+      "nativeConnection": "connected",
+      "sentProfiles": 1,
+      "receivedProfiles": 1
+    }
+  ],
+  "pageErrors": [],
+  "diagnosticJsonFiles": 2,
+  "output": "/tmp/bonjou-observer-lan-3brJuV/profile-proof",
+  "intentionalDump": true
+}

@@ -1,0 +1,64 @@
+{
+  "tool": "built-in image_gen",
+  "transparent_background": true,
+  "artworks": [
+    {
+      "name": "notes",
+      "source": "notes-source.png",
+      "intent": "generate",
+      "references": [],
+      "prompt": "Use case: stylized-concept\nAsset type: original decorative miniature for a mature nearby-sharing product, designed to remain legible at 128 pixels; not a payload icon.\nSubject: a small fanned stack of exactly three warm ivory notebook sheets, held by one graphite binder clip. A single narrow vermilion ribbon curls around the stack in an open loop. The sheets have a few short blind-embossed lines, with no readable text.\nStyle and materials: premium folded-paper sculpture, subtle tactile paper grain, restrained graphite details, quiet polished product art. The sheets feel like real cream paper with slight sculptural folds and clean edges. The ribbon is matte vermilion. No glossy plastic.\nComposition: square image, 3/4 orthographic view, compact centered complete silhouette, generous transparent margins on every side. Keep the three sheets, one clip, and one ribbon clearly readable as a simple whole. Nothing cropped.\nLighting: soft studio light from upper left, soft contact shadows around the object; preserve genuine alpha transparency outside the object and its subtle shadow.\nBackdrop: genuinely transparent, no solid background or floor plane.\nAvoid: text, letters, readable writing, logo, watermark, mascot, face, cloud, shield, checkmark, extra stationery or devices. Only the requested paper stack, clip, and ribbon."
+    },
+    {
+      "name": "nearby",
+      "source": "nearby-source.png",
+      "intent": "generate",
+      "references": [],
+      "prompt": "Use case: stylized-concept.\nAsset type: original transparent raster illustration for the Bonjou sharing website, square composition.\nPrimary request: a premium miniature folded-paper sculpture expressing nearby device-to-device sharing. Two small upright rounded graphite device slabs face each other at a slight angle, close together. An ivory folded-corner file sheet is suspended between them. One continuous narrow vermilion-red ribbon bends gently from the base of one device toward the other.\nStyle and materials: mature, quiet, meticulously crafted product illustration; warm ivory paper, graphite details, vermilion ribbon, subtle fine paper grain and clean folded edges. No drawn UI on the device faces.\nComposition: three-quarter orthographic view, centered compact full silhouette, legible at 160 pixels, generous truly transparent margin on every side, no cropped objects. Keep the main forms simple and clear.\nLighting: soft studio lighting from the upper left, restrained dimensional shading, soft contact shadows with transparent falloff.\nBackground: genuinely transparent alpha, no colored background, no floor rectangle, no opaque studio backdrop.\nConstraints: no mascots, people, text, labels, logos, watermark, cloud, server, globe, wireless icon, or additional objects. Preserve the intimate spacing of the two devices and the continuous ribbon."
+    },
+    {
+      "name": "received-reference",
+      "source": "received-source.png",
+      "intent": "generate",
+      "references": [],
+      "shipped": false,
+      "prompt": "Use case: stylized-concept\nAsset type: original transparent raster illustration for the Bonjou website, received-file state.\nSubject: a shallow open graphite document tray with a single warm ivory sheet neatly received inside. The sheet has one clearly folded corner. A vermilion red ribbon loop rests around one corner of the tray and sheet. A small raised round graphite seal sits on the paper, completely plain with no symbol.\nStyle and materials: a premium miniature folded-paper sculpture, mature and quiet, with crisp crafted paper edges, subtle paper grain, warm ivory paper, graphite details and one restrained vermilion red ribbon. Product illustration with tactile depth, not a mascot or cartoon.\nComposition: centered compact silhouette in a square canvas, three-quarter orthographic view, generous genuinely transparent margin on every side. The full tray, sheet, ribbon loop, and seal must fit inside the image with no clipping. Keep forms simple and legible when displayed at 128 pixels.\nLighting: soft studio light from the upper left with subtle contact shadows between the objects and a delicate shadow immediately beneath the sculpture.\nBackground: genuinely transparent alpha, with no backdrop, no ground plane, and no baked-in checkerboard.\nConstraints: one tray, one ivory folded-corner sheet, one red ribbon loop, one plain round graphite seal. No text, letters, logos, watermark, mascot, extra props, green success check, or symbol on the seal."
+    },
+    {
+      "name": "received",
+      "source": "received-empty-source.png",
+      "intent": "edit",
+      "references": [
+        {
+          "source": "received-source.png",
+          "role": "edit target"
+        }
+      ],
+      "prompt": "Change only the contents of this tray: remove the ivory sheet and round graphite seal, exposing an empty graphite interior. Preserve exact tray form, 3/4 camera angle, soft upper-left lighting, material grain, red ribbon on left rim, uncropped silhouette, and transparent background. No text or new objects."
+    },
+    {
+      "name": "studio",
+      "source": "studio-source.png",
+      "intent": "generate",
+      "references": [
+        {
+          "source": "received-source.png",
+          "role": "style reference only"
+        }
+      ],
+      "prompt": "Use case: stylized-concept. Asset type: original transparent raster vignette for Bonjou's design-studio sharing story. Input image: reference for physical materials, lighting, restrained ivory/graphite/vermilion palette and three-quarter orthographic camera only; create a NEW subject, do not retain the tray. Subject: three carefully fanned thick paper design swatches, one warm ivory card with a sculpted blind-embossed flowing curve, one charcoal graphite card behind it, and one smaller vermilion-red card; a narrow vermilion ribbon curls around one lower corner as an open loop. Tactile miniature sculpture with fine paper grain, crisp folded edges and soft studio lighting from upper left. Centered compact complete silhouette with generous genuinely transparent margin on all sides, legible when displayed at 144px, square composition. No ground plane or backdrop, preserve real transparent alpha. No text, letters, numbers, logos, watermark, mascot, screen UI, cloud, shield, success marks, extra objects or tray. Premium, mature and quiet, consistent with the supplied material reference."
+    },
+    {
+      "name": "project",
+      "source": "project-source.png",
+      "intent": "generate",
+      "references": [
+        {
+          "source": "received-source.png",
+          "role": "style reference only"
+        }
+      ],
+      "prompt": "Use case: stylized-concept.\nAsset type: new original transparent raster story vignette for the Bonjou website, square composition.\nReference image role: use the supplied received-file illustration ONLY as a reference for the warm ivory textured paper, graphite paper material, vermilion ribbon, lighting, camera and restrained tactile finish. Create a new subject and composition; do not edit or recreate the tray, sheet arrangement or circular seal in the reference.\nSubject: one graphite expandable project folder, slightly open to reveal exactly two neatly tabbed ivory sheets. Their tabs are plain and blank. A narrow vermilion-red ribbon is threaded through one folder eyelet and curls into a gentle open loop. The folder has carefully folded expandable paper sides and clear, simple geometry.\nStyle and materials: premium miniature paper sculpture, mature quiet product illustration, warm ivory paper with subtle fine grain, graphite folded cardstock, vermilion ribbon. Refined tactile finish with clean folded edges and believable restrained depth.\nComposition: three-quarter orthographic view, centered compact full silhouette, uncropped with generous genuinely transparent margins, legible at 144 pixels. Keep the file tabs and single open ribbon loop easy to recognize at small size.\nLighting: soft upper-left studio light matching the reference, gentle shading and soft contact shadows with transparent falloff.\nBackground: genuine transparent alpha; no opaque backdrop, no floor rectangle.\nConstraints: no readable text, lettering, logos, symbols, success mark, circular seal, cloud, server, globe, wireless icon, mascot, person, screen UI, watermark or additional objects."
+    }
+  ]
+}
