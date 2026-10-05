@@ -21,6 +21,7 @@ import { EVERYONE } from "./useSession";
 interface PaletteProps {
   open: boolean;
   onOpenChange: (value: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   peers: Peer[];
   labels: Record<string, string>;
   canVerify: boolean;
@@ -41,13 +42,13 @@ export function Palette(props: PaletteProps) {
   };
   const actions = [
     {
-      label: "Send files to this thread",
+      label: "Prepare files to offer",
       Icon: Paperclip,
       action: props.onPickFiles,
       disabled: !props.canSend,
     },
     {
-      label: "Send a folder to this thread",
+      label: "Prepare a folder to offer",
       Icon: FolderSimple,
       action: props.onPickFolder,
       disabled: !props.canSend,
@@ -75,8 +76,9 @@ export function Palette(props: PaletteProps) {
     <CommandDialog
       open={props.open}
       onOpenChange={props.onOpenChange}
+      onCloseAutoFocus={props.onCloseAutoFocus}
       title="Find a person or action"
-      description="Search people, send files, or change your settings."
+      description="Search people, prepare files, or change your settings."
     >
       <CommandInput placeholder="Type a command or a name" />
       <CommandList className="max-h-[60dvh] [&_[cmdk-item]]:min-h-11 [&_[cmdk-item]]:gap-3">

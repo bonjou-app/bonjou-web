@@ -39,7 +39,6 @@ import { entriesFor, folderNameFor, zipSize, zipStream } from "./zip";
 
 export const COORDINATOR_BASE = (
   import.meta.env.VITE_COORDINATOR_URL ??
-  import.meta.env.VITE_RELAY_URL ??
   "https://bonjou.80-225-228-65.sslip.io"
 ).replace(/\/$/, "");
 
@@ -188,20 +187,41 @@ function roomCodeFromLocation(): string {
   return new URLSearchParams(window.location.search).get("r") ?? "";
 }
 
-export function sanitizePeerName(raw: string): string {
-  const clean = [...raw.trim()]
+function replaceSessionRoute(path: string): void {
+  const { pathname, search } = window.location;
+  if (
+    /^\/(app|share)(\/|$)/.test(pathname) ||
+    pathname.startsWith("/r/") ||
+    Boolean(new URLSearchParams(search).get("r"))
+  )
+    window.history.replaceState(null, "", path);
+}
+
+function stripControls(raw: string): string {
+  return [...raw.trim()]
     .filter((char) => {
       const code = char.codePointAt(0) ?? 0;
       return code >= 0x20 && code !== 0x7f;
     })
     .join("")
     .trim();
+}
+
+export function sanitizePeerName(raw: string): string {
+  const clean = stripControls(raw);
   return [...clean].slice(0, 64).join("") || "Nearby user";
 }
 
-function sanitizeFilename(raw: string): string {
-  const clean = sanitizePeerName(raw).replace(/[/\\]/g, "_");
-  return clean === "Nearby user" ? "download" : clean.slice(0, 200);
+export function sanitizeFilename(raw: string): string {
+  const clean = stripControls(raw).replace(/[/\\]/g, "_");
+  if (!clean || clean === "." || clean === "..") return "download";
+  const chars = [...clean];
+  if (chars.length <= 200) return clean;
+  const dot = clean.lastIndexOf(".");
+  const extension = dot > 0 ? [...clean.slice(dot)] : [];
+  if (extension.length > 0 && extension.length < 200)
+    return chars.slice(0, 200 - extension.length).join("") + extension.join("");
+  return chars.slice(0, 200).join("");
 }
 
 function envelopeFor(
@@ -660,8 +680,11 @@ export function useSession(name: string, active: boolean) {
 
       const error = message.error || "the transfer was cancelled";
       waiters?.reject(new Error(error));
-      if (outgoingItem?.peerId === peerId)
+      if (outgoingItem?.peerId === peerId) {
+        if (outgoingItem.state === "offered")
+          patchOutgoing(message.requestId, { state: "failed", error });
         sendAborts.current.get(message.requestId)?.abort(error);
+      }
       const activeItem = activeReceive.current.get(message.requestId);
       if (activeItem?.peerId === peerId) {
         activeReceive.current.delete(message.requestId);
@@ -669,7 +692,7 @@ export function useSession(name: string, active: boolean) {
         patchIncoming(message.requestId, { state: "failed", error });
       }
     },
-    [finishReceive, handleEnvelope, patchIncoming, publishPeers],
+    [finishReceive, handleEnvelope, patchIncoming, patchOutgoing, publishPeers],
   );
 
   const handleLinkClosed = useCallback(
@@ -860,14 +883,14 @@ export function useSession(name: string, active: boolean) {
           setSelfPeerId(event.peerId);
           setCode(event.code);
           setNotice("");
-          window.history.replaceState(null, "", `/r/${event.code}`);
+          replaceSessionRoute(`/r/${event.code}`);
           break;
         case "joined":
           setSelfPeerId(event.peerId);
           if (!event.code) {
             setCode("");
             if (window.location.pathname.startsWith("/r/"))
-              window.history.replaceState(null, "", "/app");
+              replaceSessionRoute("/app");
           }
           if (event.code) {
             setRoomPending(false);
@@ -875,7 +898,7 @@ export function useSession(name: string, active: boolean) {
             if (roomTimer.current) clearTimeout(roomTimer.current);
             setCode(event.code);
             setNotice("");
-            window.history.replaceState(null, "", `/r/${event.code}`);
+            replaceSessionRoute(`/r/${event.code}`);
           }
           break;
         case "roster":
@@ -923,7 +946,7 @@ export function useSession(name: string, active: boolean) {
             );
             if (roomTimer.current) clearTimeout(roomTimer.current);
             if (event.code === "no_room" || event.code === "network_mismatch") {
-              window.history.replaceState(null, "", "/app");
+              replaceSessionRoute("/app");
               setCode("");
             }
           } else setNotice(event.message);
@@ -941,7 +964,7 @@ export function useSession(name: string, active: boolean) {
         setRoomError(
           "The room did not respond. Check your connection and try again.",
         );
-        window.history.replaceState(null, "", "/app");
+        replaceSessionRoute("/app");
         setCode("");
         reconnect((value) => value + 1);
       }, CONTROL_TIMEOUT_MS);
@@ -1034,7 +1057,7 @@ export function useSession(name: string, active: boolean) {
             open: () => file.stream() as ReadableStream<Uint8Array>,
           }));
       const groups = payloads.map(() => toHex(randomBytes(6)));
-
+      let offered = 0;
       for (const to of targets) {
         for (const [index, payload] of payloads.entries()) {
           const requestId = toHex(randomBytes(8));
@@ -1066,11 +1089,20 @@ export function useSession(name: string, active: boolean) {
                 stream_id: toHex(streamId),
               }),
             );
+            offered++;
           } catch (err) {
             patchOutgoing(requestId, { state: "failed", error: describe(err) });
           }
         }
       }
+      if (offered === 0)
+        throw new Error(
+          "No file offers could be sent. Your files are still prepared.",
+        );
+      if (offered < targets.length * payloads.length)
+        setNotice(
+          "Some file offers could not be delivered. Check Transfers for the recipients that disconnected.",
+        );
     },
     [name, patchOutgoing, peerName, sendDirectEnvelope],
   );
@@ -1080,14 +1112,18 @@ export function useSession(name: string, active: boolean) {
       if (incomingRef.current.get(item.requestId)?.state !== "pending") return;
       patchIncoming(item.requestId, { state: "approved" });
       if (!serviceWorkerSupported()) {
-        patchIncoming(item.requestId, {
-          state: "failed",
-          error: "this browser cannot stream downloads to disk",
-        });
+        failReceive(
+          item.requestId,
+          "this browser cannot stream downloads to disk",
+        );
         return;
       }
       try {
-        await registerServiceWorker();
+        await withTimeout(
+          registerServiceWorker(),
+          CONTROL_TIMEOUT_MS,
+          "the download helper did not become ready; try again",
+        );
         if (incomingRef.current.get(item.requestId)?.state !== "approved")
           return;
         sendDirectEnvelope(
@@ -1099,13 +1135,10 @@ export function useSession(name: string, active: boolean) {
           }),
         );
       } catch (err) {
-        patchIncoming(item.requestId, {
-          state: "failed",
-          error: describe(err),
-        });
+        failReceive(item.requestId, describe(err));
       }
     },
-    [name, patchIncoming, sendDirectEnvelope],
+    [name, patchIncoming, sendDirectEnvelope, failReceive],
   );
 
   const decline = useCallback(
@@ -1139,7 +1172,7 @@ export function useSession(name: string, active: boolean) {
         setRoomError(
           "The room did not respond. Check your connection and try again.",
         );
-        window.history.replaceState(null, "", "/app");
+        replaceSessionRoute("/app");
         setCode("");
         reconnect((value) => value + 1);
       }, CONTROL_TIMEOUT_MS);
@@ -1154,7 +1187,7 @@ export function useSession(name: string, active: boolean) {
     [beginRoom],
   );
   const leaveRoom = useCallback(() => {
-    window.history.replaceState(null, "", "/app");
+    replaceSessionRoute("/app");
     setCode("");
     setRoomError("");
     setRoomPending(false);

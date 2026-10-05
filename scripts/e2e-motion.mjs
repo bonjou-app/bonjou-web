@@ -8,6 +8,12 @@ const browser = await (engine === "webkit" ? webkit : chromium).launch({
   ...(engine === "webkit" ? {} : { channel: "chrome" }),
 });
 const errors = [];
+function watchErrors(page) {
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+}
 const phase = (page, value) =>
   page.waitForFunction(
     (value) => document.querySelector(".hero-scene")?.dataset.phase === value,
@@ -28,11 +34,9 @@ try {
     reducedMotion: "no-preference",
   });
   const page = await context.newPage();
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
+  watchErrors(page);
   await page.goto(base);
+  await page.locator(".hero-scene").scrollIntoViewIfNeeded();
   await page.getByRole("button", { name: "Pause demo", exact: true }).waitFor();
   await phase(page, "offered");
   await phase(page, "accepted");
@@ -138,7 +142,9 @@ try {
     reducedMotion: "no-preference",
   });
   const pointerPage = await pointerContext.newPage();
+  watchErrors(pointerPage);
   await pointerPage.goto(base);
+  await pointerPage.locator(".hero-scene").scrollIntoViewIfNeeded();
   await pointerPage
     .getByRole("button", { name: "Replay demo", exact: true })
     .waitFor();
@@ -167,6 +173,7 @@ try {
     reducedMotion: "no-preference",
   });
   const mobile = await mobileContext.newPage();
+  watchErrors(mobile);
   await mobile.goto(base);
   await mobile.locator(".hero-scene").waitFor();
   await mobile.evaluate(() => document.fonts.ready);

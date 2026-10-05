@@ -22,10 +22,14 @@ function isApp() {
 export default function App() {
   const [visible, setVisible] = useState(isApp);
   const [visited, setVisited] = useState(isApp);
+  const [routeRevision, setRouteRevision] = useState(0);
   const appPath = useRef(
     isApp() ? location.pathname + location.search : "/app",
   );
   const theme = useTheme();
+  const rememberAppPath = useCallback((path: string) => {
+    appPath.current = path;
+  }, []);
   const openApp = useCallback(() => {
     history.pushState(null, "", appPath.current);
     setVisible(true);
@@ -36,6 +40,7 @@ export default function App() {
     const pop = () => {
       const next = isApp();
       setVisible(next);
+      setRouteRevision((value) => value + 1);
       if (next) setVisited(true);
     };
     const follow = (event: MouseEvent) => {
@@ -82,7 +87,12 @@ export default function App() {
             </main>
           }
         >
-          <ShareApp visible={visible} theme={theme} />
+          <ShareApp
+            visible={visible}
+            routeRevision={routeRevision}
+            theme={theme}
+            onAppPath={rememberAppPath}
+          />
         </Suspense>
       ) : null}
     </TooltipProvider>

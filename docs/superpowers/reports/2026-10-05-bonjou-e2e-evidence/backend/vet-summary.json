@@ -1,0 +1,6 @@
+{
+  "command": "go vet ./...",
+  "exit_code": 0,
+  "seconds": 0.66,
+  "log": "/tmp/bonjou-backend-e2e-2026-10-05/vet.log"
+}

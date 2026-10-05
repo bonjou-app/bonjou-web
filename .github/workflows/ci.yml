@@ -17,10 +17,71 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '24'
+          node-version: "24"
           cache: npm
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: npm run check:protocol
       - run: npm test
       - run: npm run build
+
+  end-to-end:
+    name: End-to-end browsers
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: bonjou-app/bonjou-cli
+          ref: 2e96dbf059a2727cd7e1e54381a8146dae43d497
+          path: .e2e-cli
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .e2e-cli/go.mod
+          cache-dependency-path: .e2e-cli/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chrome webkit
+      - run: npm run check:protocol -- .e2e-cli
+      - run: npm run build
+        env:
+          VITE_COORDINATOR_URL: http://127.0.0.1:46330
+      - name: Verify complete browser journeys
+        shell: bash
+        run: |
+          set -euo pipefail
+          go build -C .e2e-cli -o "$RUNNER_TEMP/bonjou-coordinator" ./cmd/bonjou-relay
+          "$RUNNER_TEMP/bonjou-coordinator" -origins http://127.0.0.1:4173 -trust-proxy=false -log-dir "$RUNNER_TEMP/coordinator-logs" >"$RUNNER_TEMP/coordinator.log" 2>&1 &
+          coordinator_pid=$!
+          npm run preview -- --port 4173 --strictPort >"$RUNNER_TEMP/preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$coordinator_pid" "$preview_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:46330/healthz >/dev/null && curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            cat "$RUNNER_TEMP/coordinator.log" "$RUNNER_TEMP/preview.log"
+            exit 1
+          fi
+          E2E_REPORT_DIR="$RUNNER_TEMP/bonjou-e2e" npm run e2e:all
+      - name: Preserve browser verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-verification
+          path: |
+            ${{ runner.temp }}/bonjou-e2e
+            ${{ runner.temp }}/coordinator.log
+            ${{ runner.temp }}/preview.log
+          retention-days: 14
+          if-no-files-found: ignore

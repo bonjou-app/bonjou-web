@@ -61,12 +61,14 @@ import type { IncomingItem, OutgoingItem, ThreadEvent } from "./useSession";
 function SidePanel({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   title,
   note,
   children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   title: string;
   note?: string;
   children: ReactNode;
@@ -74,6 +76,7 @@ function SidePanel({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
+        onCloseAutoFocus={onCloseAutoFocus}
         className="side-panel data-[side=right]:w-full data-[side=right]:sm:max-w-md gap-0"
         side="right"
       >
@@ -95,17 +98,20 @@ function SidePanel({
 function Modal({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   children,
   wide,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   children: ReactNode;
   wide?: boolean;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        onCloseAutoFocus={onCloseAutoFocus}
         className={`modal max-h-[calc(100dvh-2rem)] overflow-y-auto gap-6 p-6 ${wide ? "sm:max-w-lg" : "sm:max-w-md"}`}
       >
         {children}
@@ -121,6 +127,7 @@ function Modal({
 export function VerifyDialog({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   peerName,
   fingerprint,
   verified,
@@ -128,6 +135,7 @@ export function VerifyDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   peerName: string;
   fingerprint: string;
   verified: boolean;
@@ -139,7 +147,11 @@ export function VerifyDialog({
   const bytes = fingerprint ? fingerprint.split(/[\s:]+/).filter(Boolean) : [];
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange}>
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      onCloseAutoFocus={onCloseAutoFocus}
+    >
       <DialogHeader className="gap-3">
         <ShieldCheck size={28} weight="duotone" aria-hidden="true" />
         <DialogTitle className="text-xl tracking-tight">
@@ -171,13 +183,13 @@ export function VerifyDialog({
         ) : null}
         <span className="spacer" />
         <DialogClose asChild>
-          <Button type="button" variant="outline" className="h-10 px-4">
+          <Button type="button" variant="outline" className="h-11 px-4">
             Not now
           </Button>
         </DialogClose>
         <Button
           type="button"
-          className="h-10 px-4"
+          className="h-11 px-4"
           disabled={bytes.length === 0}
           onClick={() => {
             onConfirm();
@@ -198,6 +210,7 @@ export function VerifyDialog({
 export function RoomDialog({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   code,
   onCreate,
   onJoin,
@@ -207,6 +220,7 @@ export function RoomDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   code: string;
   onCreate: () => void;
   onJoin: (code: string) => void;
@@ -218,7 +232,12 @@ export function RoomDialog({
   const link = code ? `${window.location.origin}/r/${code}` : "";
 
   return (
-    <Modal open={open} onOpenChange={onOpenChange} wide>
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      onCloseAutoFocus={onCloseAutoFocus}
+      wide
+    >
       <DialogHeader className="gap-3">
         <div className="flex size-11 items-center justify-center rounded-lg bg-muted">
           <UsersThree size={26} weight="duotone" aria-hidden="true" />
@@ -234,7 +253,7 @@ export function RoomDialog({
       </DialogHeader>
 
       {error ? (
-        <Alert variant="destructive">
+        <Alert variant="destructive" id="room-code-error">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
@@ -242,8 +261,8 @@ export function RoomDialog({
         <>
           <div className="room-code">
             <code>{code}</code>
-            <CopyButton value={code} label="Copy code" className="h-10 px-4" />
-            <CopyButton value={link} label="Copy link" className="h-10 px-4" />
+            <CopyButton value={code} label="Copy code" className="h-11 px-4" />
+            <CopyButton value={link} label="Copy link" className="h-11 px-4" />
           </div>
 
           <div className="room-qr">
@@ -284,12 +303,12 @@ export function RoomDialog({
         </>
       ) : (
         <Tabs defaultValue="create" className="gap-5">
-          <TabsList className="w-full group-data-horizontal/tabs:h-10">
-            <TabsTrigger value="create" className="h-8">
+          <TabsList className="w-full group-data-horizontal/tabs:h-12">
+            <TabsTrigger value="create" className="h-11">
               <UsersThree aria-hidden="true" />
               Create a room
             </TabsTrigger>
-            <TabsTrigger value="join" className="h-8">
+            <TabsTrigger value="join" className="h-11">
               <SignIn aria-hidden="true" />
               Join a room
             </TabsTrigger>
@@ -325,15 +344,19 @@ export function RoomDialog({
                   onChange={(event) =>
                     setEntry(event.target.value.toUpperCase())
                   }
-                  placeholder="ABC-234"
+                  placeholder="7K2-9QX"
                   maxLength={7}
                   autoComplete="off"
                   autoCapitalize="characters"
                   spellCheck={false}
                   disabled={pending}
                   aria-invalid={Boolean(error)}
+                  aria-describedby={`room-code-hint${error ? " room-code-error" : ""}`}
                   aria-label="Room code"
                 />
+                <FieldDescription id="room-code-hint">
+                  Six letters or numbers, like 7K2-9QX. The dash is optional.
+                </FieldDescription>
               </Field>
               <Button
                 type="submit"
@@ -357,6 +380,7 @@ export function RoomDialog({
 export function SettingsPanel({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   name,
   onName,
   themeChoice,
@@ -369,6 +393,7 @@ export function SettingsPanel({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   name: string;
   onName: (value: string) => void;
   themeChoice: ThemeChoice;
@@ -386,7 +411,12 @@ export function SettingsPanel({
   useEffect(() => setDraft(name), [name, open]);
 
   return (
-    <SidePanel open={open} onOpenChange={onOpenChange} title="Settings">
+    <SidePanel
+      open={open}
+      onOpenChange={onOpenChange}
+      onCloseAutoFocus={onCloseAutoFocus}
+      title="Settings"
+    >
       <FieldGroup>
         <form
           onSubmit={(event) => {
@@ -403,7 +433,7 @@ export function SettingsPanel({
             <div className="flex gap-2">
               <Input
                 id="settings-name"
-                className="h-10 min-w-0"
+                className="h-11 min-w-0"
                 value={draft}
                 maxLength={64}
                 onChange={(event) => {
@@ -414,7 +444,7 @@ export function SettingsPanel({
               <Button
                 type="submit"
                 variant="outline"
-                className="h-10 px-4"
+                className="h-11 px-4"
                 disabled={!draft.trim() || draft.trim() === name}
               >
                 Save
@@ -638,16 +668,19 @@ export function transferHistory(
 export function TransfersPanel({
   open,
   onOpenChange,
+  onCloseAutoFocus,
   entries,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
   entries: HistoryEntry[];
 }) {
   return (
     <SidePanel
       open={open}
       onOpenChange={onOpenChange}
+      onCloseAutoFocus={onCloseAutoFocus}
       title="Transfers"
       note="This session only. Closing the tab forgets all of it."
     >

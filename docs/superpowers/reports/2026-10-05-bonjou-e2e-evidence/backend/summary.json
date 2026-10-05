@@ -1,0 +1,50 @@
+{
+  "race": {
+    "command": "go test -race -count=1 -json ./...",
+    "head": "2e96dbf059a2727cd7e1e54381a8146dae43d497",
+    "exit_code": 0,
+    "seconds": 4.96,
+    "passed_test_events": 144,
+    "passed_top_level_tests": 115,
+    "passed_packages": 5,
+    "failures": [],
+    "log": "/tmp/bonjou-backend-e2e-2026-10-05/race.jsonl",
+    "stderr": "/tmp/bonjou-backend-e2e-2026-10-05/race.stderr.log",
+    "skipped_tests": [
+      {
+        "package": "github.com/bonjou-app/bonjou-cli/internal/commands",
+        "test": "TestUnescapeShellPathLeavesWindowsSeparatorsAlone"
+      }
+    ],
+    "top_level_test_events": 116,
+    "tested_packages": [
+      "github.com/bonjou-app/bonjou-cli/internal/queue",
+      "github.com/bonjou-app/bonjou-cli/internal/relay",
+      "github.com/bonjou-app/bonjou-cli/internal/ui",
+      "github.com/bonjou-app/bonjou-cli/internal/network",
+      "github.com/bonjou-app/bonjou-cli/internal/commands"
+    ],
+    "go_source_diff": [],
+    "ending_head": "2e96dbf059a2727cd7e1e54381a8146dae43d497"
+  },
+  "vet": {
+    "command": "go vet ./...",
+    "exit_code": 0,
+    "seconds": 0.66,
+    "log": "/tmp/bonjou-backend-e2e-2026-10-05/vet.log"
+  },
+  "lint": {
+    "command": "golangci-lint run ./...",
+    "exit_code": 0,
+    "seconds": 1.19,
+    "log": "/tmp/bonjou-backend-e2e-2026-10-05/lint.log"
+  },
+  "gofmt": {
+    "command": "gofmt -l <all tracked Go files>",
+    "head": "2e96dbf059a2727cd7e1e54381a8146dae43d497",
+    "exit_code": 0,
+    "tracked_go_files": 63,
+    "unformatted": [],
+    "log": "/tmp/bonjou-backend-e2e-2026-10-05/gofmt.log"
+  }
+}

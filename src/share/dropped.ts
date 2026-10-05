@@ -59,15 +59,19 @@ function readBatch(
   return new Promise((resolve, reject) => reader.readEntries(resolve, reject));
 }
 
-async function walk(entry: FileSystemEntryLike, prefix: string): Promise<File[]> {
+async function walk(
+  entry: FileSystemEntryLike,
+  prefix: string,
+): Promise<File[]> {
   const path = prefix ? `${prefix}/${entry.name}` : entry.name;
 
   if (entry.isFile) {
     try {
       return [withPath(await readFile(entry), path)];
     } catch {
-      // An unreadable file is skipped rather than failing the whole drop.
-      return [];
+      throw new Error(
+        `Could not read "${path}". Nothing was offered. Check the file's permissions and try again.`,
+      );
     }
   }
 
@@ -80,7 +84,9 @@ async function walk(entry: FileSystemEntryLike, prefix: string): Promise<File[]>
     try {
       batch = await readBatch(reader);
     } catch {
-      break;
+      throw new Error(
+        `Could not read folder "${path}". Nothing was offered. Check the folder's permissions and try again.`,
+      );
     }
     if (batch.length === 0) break;
     for (const child of batch) out.push(...(await walk(child, path)));

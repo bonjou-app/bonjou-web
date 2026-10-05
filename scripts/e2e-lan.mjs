@@ -6,8 +6,7 @@ import { chromium, webkit } from "playwright";
 const webkitRun = process.env.PLAYWRIGHT_ENGINE === "webkit";
 const browserType = webkitRun ? webkit : chromium;
 
-const APP = new URL("/app", process.env.APP_URL ?? "http://127.0.0.1:4173")
-  .href;
+const APP = new URL("/app", process.env.APP_URL ?? "http://127.0.0.1:4173").href;
 const BROWSER_CHANNEL = process.env.PLAYWRIGHT_CHANNEL ?? "chrome";
 
 async function contextFor(browser, name) {
@@ -146,6 +145,7 @@ async function main() {
         mimeType: "text/plain",
         buffer: fileBytes,
       });
+    await alice.page.getByRole("button", { name: /^Offer files to / }).click();
     await bob.page.getByText("direct-proof.txt", { exact: true }).waitFor();
     await bob.page.screenshot({
       path: "/tmp/bonjou-file-approval-desktop.png",
@@ -177,6 +177,7 @@ async function main() {
         mimeType: "text/plain",
         buffer: fileBytes,
       });
+    await alice.page.getByRole("button", { name: /^Offer files to / }).click();
     const drawer = bob.page.getByRole("dialog");
     await drawer.getByText("mobile-proof.txt", { exact: true }).waitFor();
     await bob.page.evaluate(async () => {
@@ -220,6 +221,7 @@ async function main() {
         mimeType: "text/plain",
         buffer: fileBytes,
       });
+    await alice.page.getByRole("button", { name: /^Offer files to / }).click();
     await drawer.getByText("decline-proof.txt", { exact: true }).waitFor();
     await drawer.getByRole("button", { name: "Decline", exact: true }).click();
     await drawer.waitFor({ state: "hidden" });

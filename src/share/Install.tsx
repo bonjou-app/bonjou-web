@@ -105,7 +105,7 @@ const PLATFORMS: Platform[] = [
       name: "WinGet Package Manager",
       badge: "Recommended",
       command: "winget install HamzaAbdulWahab.Bonjou",
-      why: "Built into Windows 11 and recent Windows 10. Provides clean setup and automatic updates.",
+      why: "Built into Windows 11 and recent Windows 10. Installs Bonjou and manages upgrades with winget upgrade.",
     },
     alternatives: [
       {

@@ -86,6 +86,13 @@ async function main() {
           await page.goto(`${BASE}/`);
           await page.getByRole("heading", { level: 1 }).waitFor();
           await fits(page, `landing ${theme} ${width}`);
+          const sceneControl = await page
+            .locator(".demo-controls button")
+            .boundingBox();
+          assert(
+            sceneControl.x >= 0 && sceneControl.x + sceneControl.width <= width,
+            `landing ${theme} ${width}: sharing demo control is clipped`,
+          );
           assert.equal(
             await page
               .getByText("Coordinator offline", { exact: true })
@@ -194,8 +201,8 @@ async function main() {
         await screenshot(page, `workspace-${theme}`);
         assert.equal(
           await page.locator('.composer [data-slot="input-group"]').count(),
-          0,
-          "an empty network has invitation controls instead of a disabled composer",
+          1,
+          "an empty network keeps the local staging controls available",
         );
         assert.equal(
           await page.locator('.thread [data-slot="empty"]').count(),
@@ -267,8 +274,14 @@ async function main() {
           await fits(page, `thread ${theme} ${width}`);
           assert.equal(
             await page.locator(".composer").count(),
-            0,
-            "no recipients means no composer",
+            1,
+            "local preparation remains available without recipients",
+          );
+          assert.equal(
+            await page
+              .getByRole("button", { name: "Send message", exact: true })
+              .isDisabled(),
+            true,
           );
           if (width === 390) await screenshot(page, `thread-mobile-${theme}`);
           await page.getByRole("button", { name: "Back to the list" }).click();

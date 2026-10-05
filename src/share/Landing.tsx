@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight";
 import { ArrowUpRight } from "@phosphor-icons/react/dist/csr/ArrowUpRight";
 import { Moon } from "@phosphor-icons/react/dist/csr/Moon";
@@ -22,14 +22,18 @@ import {
 } from "@/components/ui/sheet";
 import { Logo } from "./Logo";
 import { Install } from "./Install";
-import { NearbyScene } from "./NearbyScene";
+import { HandoffLab, type DemoSampleId } from "./HandoffLab";
+import { SharingStories } from "./SharingStories";
+import { ConnectionExplorer } from "./ConnectionExplorer";
+import { BrandArtwork } from "./BrandArtwork";
 import { useLandingMotion } from "./useLandingMotion";
 import { useMediaQuery, type ResolvedTheme } from "./theme";
 
 const REPO = "https://github.com/bonjou-app/bonjou-cli";
-const WEB_REPO = "https://github.com/bonjou-app/bonjou-web";
 const links = [
-  ["#how", "How it works"],
+  ["#try", "Try a handoff"],
+  ["#stories", "Made for your day"],
+  ["#connection", "Your setup"],
   ["#install", "For the terminal"],
   ["#faq", "Questions"],
 ];
@@ -45,7 +49,28 @@ export function Landing({
   const site = useRef<HTMLDivElement>(null);
   useLandingMotion(site);
   const [menu, setMenu] = useState(false);
+  const [labBusy, setLabBusy] = useState(false);
+  const [sampleRequest, setSampleRequest] = useState<{
+    id: DemoSampleId;
+    revision: number;
+  }>();
+  const trySample = (id: DemoSampleId) => {
+    if (labBusy) return;
+    setSampleRequest((current) => ({
+      id,
+      revision: (current?.revision ?? 0) + 1,
+    }));
+    document.getElementById("handoff")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+      block: "start",
+    });
+  };
   const narrow = useMediaQuery("(max-width: 760px)");
+  useEffect(() => {
+    if (!narrow) setMenu(false);
+  }, [narrow]);
   return (
     <div className="site" ref={site}>
       <a className="skip-link" href="#main-content">
@@ -105,7 +130,7 @@ export function Landing({
                       <ArrowUpRight />
                     </a>
                   ))}
-                  <a href={WEB_REPO} target="_blank" rel="noreferrer">
+                  <a href={REPO} target="_blank" rel="noreferrer">
                     Source on GitHub
                     <ArrowUpRight />
                   </a>
@@ -116,122 +141,106 @@ export function Landing({
         </div>
       </header>
       <main id="main-content">
-        <section className="hero" aria-labelledby="hero-title">
-          <div className="hero-copy">
-            <p className="eyebrow">
-              <span aria-hidden="true" /> Made for the same Wi-Fi
-            </p>
-            <h1 id="hero-title">
-              <span className="hero-line">
-                <span>Right here.</span>
-              </span>
-              <span className="hero-line">
-                <span>
-                  Right to you<span className="hero-period">.</span>
+        <section
+          className="hero hands-on-hero"
+          id="try"
+          aria-labelledby="hero-title"
+        >
+          <div className="hero-intro">
+            <div>
+              <p className="hero-kicker">
+                <span aria-hidden="true" />
+                Nearby sharing. A little more human.
+              </p>
+              <h1 id="hero-title">
+                <span className="hero-line">
+                  <span>Pass it </span>
                 </span>
-              </span>
-            </h1>
-            <p className="hero-description">
-              The photo from lunch. The folder for tomorrow.
-              <br className="desktop-break" /> Send it straight to someone
-              nearby.
-            </p>
-            <div className="hero-actions">
-              <Button onClick={onOpenApp} className="h-12 px-6 text-base">
-                Start sharing <ArrowRight />
-              </Button>
-              <span>No account. No installation.</span>
+                <span className="hero-line">
+                  <span>
+                    along<span className="hero-period">.</span>
+                  </span>
+                </span>
+              </h1>
             </div>
-            <a className="hero-cli" href="#install">
-              More at home in a terminal?{" "}
-              <span>
-                Meet bonjou-cli <ArrowUpRight />
-              </span>
+            <div className="hero-intro-copy">
+              <p>
+                Good notes. The next concept. A whole project.
+                <br />
+                Straight to someone on your Wi-Fi.
+              </p>
+              <div className="hero-actions">
+                <Button onClick={onOpenApp} className="h-12 px-6 text-base">
+                  Start sharing
+                  <ArrowRight />
+                </Button>
+                <span>No account. No installation.</span>
+              </div>
+              <a className="hero-lab-link" href="#handoff">
+                <span>Or take the controls below</span>
+                <ArrowRight />
+              </a>
+            </div>
+          </div>
+          <div id="handoff">
+            <HandoffLab
+              requestedSample={sampleRequest}
+              onOpenApp={onOpenApp}
+              onBusyChange={setLabBusy}
+            />
+          </div>
+          <div className="hero-proof" aria-label="Sharing principles">
+            <span>Choose a person</span>
+            <span>They approve</span>
+            <span>Files travel directly</span>
+            <a href={REPO} target="_blank" rel="noreferrer">
+              Open source
+              <ArrowUpRight />
             </a>
           </div>
-          <NearbyScene />
         </section>
-        <div className="principles" aria-label="How Bonjou shares">
-          <span>Device to device</span>
-          <span>Encrypted in transit</span>
-          <span>You choose what to receive</span>
-          <a href={WEB_REPO} target="_blank" rel="noreferrer">
-            Open source <ArrowUpRight />
-          </a>
-        </div>
-        <section className="how-section" id="how">
-          <div className="section-intro" data-reveal>
-            <p className="eyebrow">A familiar kind of sharing</p>
-            <h2>
-              Same room.
+        <SharingStories
+          onTrySample={trySample}
+          onOpenApp={onOpenApp}
+          demoBusy={labBusy}
+        />
+        <section className="consent-interlude" aria-labelledby="consent-title">
+          <div className="consent-intro" data-reveal>
+            <p>Before the file, a choice.</p>
+            <h2 id="consent-title">
+              Your file.
               <br />
-              Fewer steps.
+              Their call.
             </h2>
-            <p>
-              No link to upload. No inbox to search. Just you, the person beside
-              you, and a direct connection.
-            </p>
+            <BrandArtwork
+              kind="notes"
+              className="consent-art"
+              sizes="(max-width: 760px) 104px, 176px"
+            />
           </div>
-          <ol className="sharing-steps" data-reveal>
-            <li>
-              <span>01</span>
-              <div>
-                <h3>Say hello.</h3>
-                <p>
-                  Open Bonjou on both devices and choose a name. People you can
-                  reach on your network appear automatically.
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>02</span>
-              <div>
-                <h3>Pick a person. Send something.</h3>
-                <p>
-                  A quick message, a file, or a whole folder. Use a room code
-                  when you want a smaller group.
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>03</span>
-              <div>
-                <h3>They accept. It arrives.</h3>
-                <p>
-                  Files travel directly between your devices. Every download
-                  starts with the recipient&rsquo;s approval.
-                </p>
-              </div>
-            </li>
-          </ol>
-        </section>
-        <section className="privacy-section" data-reveal>
-          <p className="eyebrow">Close by, kept private</p>
-          <h2>
-            Your files take
-            <br />
-            the local route.
-          </h2>
-          <div className="privacy-copy">
+          <div className="consent-copy" data-reveal>
             <p>
-              A small online service helps browsers find each other. Your
-              messages and files then travel over an encrypted connection
-              between your devices.
+              Prepare a few files. Pick the right person. Offer them when you’re
+              ready. Nothing starts arriving until they accept.
             </p>
-            <p>
-              Bonjou&rsquo;s server never receives your file contents. Networks
-              that isolate devices, including some guest Wi-Fi networks, can
-              prevent a connection.
-            </p>
-            <a
-              href={`${REPO}/blob/main/docs/security-model.md`}
-              target="_blank"
-              rel="noreferrer"
+            <div className="consent-flow" aria-label="File approval sequence">
+              <span>Prepare</span>
+              <ArrowRight aria-hidden="true" />
+              <span>Offer</span>
+              <ArrowRight aria-hidden="true" />
+              <strong>Approve</strong>
+            </div>
+            <Button
+              variant="secondary"
+              className="h-12 px-6"
+              onClick={onOpenApp}
             >
-              Read the security model <ArrowUpRight />
-            </a>
+              Prepare files in Bonjou
+              <ArrowUpRight />
+            </Button>
           </div>
         </section>
+        <ConnectionExplorer onOpenApp={onOpenApp} />
         <section className="install-section" id="install">
           <div className="section-heading" data-reveal>
             <div>
@@ -248,7 +257,11 @@ export function Landing({
         <section className="faq-section" data-reveal id="faq">
           <div>
             <p className="eyebrow">Good to know</p>
-            <h2>A few questions.</h2>
+            <h2>
+              The useful
+              <br />
+              little details.
+            </h2>
           </div>
           <Accordion type="single" collapsible className="faq-list">
             <AccordionItem value="network">
@@ -276,10 +289,10 @@ export function Landing({
             <AccordionItem value="files">
               <AccordionTrigger>Where do received files go?</AccordionTrigger>
               <AccordionContent>
-                Into your browser&rsquo;s downloads after you accept. Folders
+                Check your browser&rsquo;s downloads after you accept. Folders
                 arrive as ZIP archives. Bonjou keeps the transfer list and
-                messages for this session only; your downloaded files stay on
-                your device.
+                messages for this session only. Files you save are separate from
+                that list.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="connection">
@@ -306,7 +319,14 @@ export function Landing({
           </Accordion>
         </section>
         <section className="closing" data-reveal>
-          <h2>Have something to pass along?</h2>
+          <div>
+            <p>Less distance. More doing.</p>
+            <h2>
+              Your next handoff
+              <br />
+              starts right here.
+            </h2>
+          </div>
           <Button onClick={onOpenApp} className="h-12 px-6 text-base">
             Open Bonjou <ArrowRight />
           </Button>
@@ -318,10 +338,10 @@ export function Landing({
           <span>bonjou</span>
         </a>
         <p>A little less distance between devices.</p>
-        <a href={WEB_REPO} target="_blank" rel="noreferrer">
+        <a href={REPO} target="_blank" rel="noreferrer">
           <GithubLogo size={20} /> Source on GitHub
         </a>
-        <a href={`${WEB_REPO}/issues`} target="_blank" rel="noreferrer">
+        <a href={`${REPO}/issues`} target="_blank" rel="noreferrer">
           Report an issue <ArrowUpRight size={16} />
         </a>
       </footer>

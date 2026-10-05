@@ -1,0 +1,6 @@
+{
+  "command": "golangci-lint run ./...",
+  "exit_code": 0,
+  "seconds": 1.19,
+  "log": "/tmp/bonjou-backend-e2e-2026-10-05/lint.log"
+}

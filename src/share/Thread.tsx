@@ -1,10 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { DownloadSimple as ArrowDownToLine } from "@phosphor-icons/react/dist/csr/DownloadSimple";
 import { ArrowsLeftRight as ArrowRightLeft } from "@phosphor-icons/react/dist/csr/ArrowsLeftRight";
 import { CaretLeft as ChevronLeft } from "@phosphor-icons/react/dist/csr/CaretLeft";
-import { ChatCircle as MessageSquare } from "@phosphor-icons/react/dist/csr/ChatCircle";
 import { ShieldCheck } from "@phosphor-icons/react/dist/csr/ShieldCheck";
-import { WifiHigh as Wifi } from "@phosphor-icons/react/dist/csr/WifiHigh";
 
 import { CopyButton } from "@/components/interior/copy-button";
 import {
@@ -27,6 +24,7 @@ import {
 } from "@/components/ui/empty";
 import { IncomingRow, MessageRow, OutgoingRow } from "./EventRow";
 import { FileIcon } from "./FileIcon";
+import { BrandArtwork } from "./BrandArtwork";
 import { formatBytes } from "./transfer";
 import {
   EVERYONE,
@@ -58,6 +56,8 @@ interface ThreadProps {
   onRoom: () => void;
   onRetry: () => void;
   verified: boolean;
+  unavailable?: boolean;
+  onChooseRecipient?: () => void;
 }
 
 /** Rows are events, except consecutive outgoing items of one fan-out. */
@@ -95,6 +95,8 @@ export function Thread(props: ThreadProps) {
     onRoom,
     onRetry,
     verified,
+    unavailable = false,
+    onChooseRecipient,
   } = props;
 
   const [connectionSlow, setConnectionSlow] = useState(false);
@@ -187,14 +189,10 @@ export function Thread(props: ThreadProps) {
       received.length === 0 ? (
         <Empty className="thread-empty max-w-md flex-none gap-4">
           <EmptyHeader>
-            <EmptyMedia
-              variant="icon"
-              className="size-14 bg-transparent text-[var(--bj-acc-text)] [&_svg]:size-8"
-            >
-              <ArrowDownToLine
-                className="size-6"
-                weight="duotone"
-                aria-hidden="true"
+            <EmptyMedia className="empty-artwork">
+              <BrandArtwork
+                kind="received"
+                sizes="(max-width: 860px) 128px, 160px"
               />
             </EmptyMedia>
             <EmptyTitle
@@ -205,8 +203,8 @@ export function Thread(props: ThreadProps) {
               Your received files, all together
             </EmptyTitle>
             <EmptyDescription>
-              Files you accept will appear here. Your browser saves them to your
-              downloads folder.
+              Files you accept will appear here. Check your browser&rsquo;s
+              downloads to find or save them.
             </EmptyDescription>
           </EmptyHeader>
           <p className="empty-note">This list lasts until you close the tab.</p>
@@ -251,19 +249,11 @@ export function Thread(props: ThreadProps) {
     ) : rows.length === 0 ? (
       <Empty className="thread-empty max-w-md flex-none gap-4">
         <EmptyHeader>
-          <EmptyMedia
-            variant="icon"
-            className="size-14 bg-transparent text-[var(--bj-acc-text)] [&_svg]:size-8"
-          >
-            {threadId === EVERYONE ? (
-              <Wifi className="size-6" weight="regular" aria-hidden="true" />
-            ) : (
-              <MessageSquare
-                className="size-6"
-                weight="duotone"
-                aria-hidden="true"
-              />
-            )}
+          <EmptyMedia className="empty-artwork">
+            <BrandArtwork
+              kind={threadId === EVERYONE ? "nearby" : "notes"}
+              sizes="(max-width: 860px) 128px, 160px"
+            />
           </EmptyMedia>
           <EmptyTitle
             role="heading"
@@ -276,7 +266,9 @@ export function Thread(props: ThreadProps) {
                 : code
                   ? "Your room is ready."
                   : "Share something with someone nearby."
-              : `Say hello to ${title}`}
+              : unavailable
+                ? `Waiting for ${title}`
+                : `Say hello to ${title}`}
           </EmptyTitle>
           <EmptyDescription>
             {threadId === EVERYONE
@@ -285,7 +277,9 @@ export function Thread(props: ThreadProps) {
                 : code
                   ? "Invite someone on your Wi-Fi with your room code. You can start sharing as soon as they join."
                   : "Open Bonjou on another device using the same Wi-Fi. They’ll appear here when a direct connection is ready."
-              : "Messages and file offers in this conversation go only to this person."}
+              : unavailable
+                ? "This conversation stays here while they are disconnected. You can wait for them or choose someone else."
+                : "Messages and file offers in this conversation go only to this person."}
           </EmptyDescription>
         </EmptyHeader>
         {threadId === EVERYONE && peerCount === 0 ? (
@@ -445,11 +439,33 @@ export function Thread(props: ThreadProps) {
         </div>
       </header>
 
+      {unavailable ? (
+        <div className="thread-unavailable">
+          <p role="status">
+            {title} is no longer connected. Your draft and prepared files are
+            still on this device.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 shrink-0 px-4"
+            onClick={onChooseRecipient}
+          >
+            Choose another recipient
+          </Button>
+        </div>
+      ) : null}
+
       <div className="thread-scroll">
         <div
           className="thread-body bj-scroll"
           ref={scrollRef}
           onScroll={onScroll}
+          tabIndex={0}
+          role="region"
+          aria-label={
+            threadId === "received" ? "Received files" : `${title} conversation`
+          }
         >
           {body}
         </div>

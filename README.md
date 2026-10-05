@@ -10,6 +10,17 @@ The Bonjou marketing website and browser app for encrypted chat and file sharing
 - [CLI and coordinator source](https://github.com/bonjou-app/bonjou-cli)
 - [Bonjou organization](https://github.com/bonjou-app)
 
+The homepage includes a hands-on local handoff lab, three selectable sharing
+stories, a browser/CLI setup explorer, and original paper-and-ribbon artwork.
+The lab opens two endpoints in the same browser only after approval, verifies
+received bytes, and offers an explicit download. It does not test another device
+or start a Bonjou session. The setup check tests local browser capabilities
+without opening a connection.
+
+The workspace lets users pick, drop, or paste files into a staging tray, review
+them, choose recipients, and explicitly offer them. Recipients approve before
+payload streaming; downloaded bytes are authenticated and verified.
+
 ## Development
 
 Use Node.js 24.x. This repository builds independently; no parent
@@ -43,7 +54,7 @@ npm run check:protocol -- /path/to/bonjou-cli
 To exercise a local coordinator, run this from the CLI repo:
 
 ```sh
-go run ./cmd/bonjou-relay -origins http://127.0.0.1:5173,http://localhost:5173 -trust-proxy=false
+go run ./cmd/bonjou-relay -origins http://127.0.0.1:4173 -trust-proxy=false
 ```
 
 Then run `npm run smoke` here. To point the browser at the local coordinator, copy
@@ -52,11 +63,31 @@ room isolation, encrypted signaling, and rejection of payload endpoints. Set
 `COORDINATOR` to test another coordinator you operate. `RELAY` and
 `VITE_RELAY_URL` remain supported configuration aliases.
 
-Run `npm run e2e:ui`, `npm run e2e:lan`, `npm run e2e:workflows`,
-`npm run e2e:accessibility`, and `npm run e2e:motion` against the Vite app.
-Set `APP_URL` if it is not at `http://127.0.0.1:4173`. Allow that exact origin
-in the coordinator's `-origins` flag. Run coordinator-backed suites one at a
-time: their synthetic peers share a discovery network.
+For the complete sequential browser suite, build and start a preview:
+
+```sh
+VITE_COORDINATOR_URL=http://127.0.0.1:46330 npm run build
+npm run preview -- --port 4173 --strictPort
+```
+
+Then run `npm run e2e:all`. Install its browser runtimes with
+`npx playwright install chrome webkit` first (`--with-deps` on Linux).
+Set `APP_URL` and allow that exact origin in the coordinator's `-origins` flag.
+Run coordinator-backed suites one at a time: their peers share a discovery
+network. `E2E_REPORT_DIR` controls where logs, screenshots, and `results.json`
+are saved. The full runner defaults its smoke check to the local coordinator;
+set `COORDINATOR` when testing another endpoint you operate.
+
+The suite covers responsive UI, motion, direct sharing, session workflows,
+accessibility, populated keyboard flows, connection loss, file staging, the
+homepage lab and setup explorer, boundary failures, and mixed Chrome/WebKit
+transfers. UI, motion, LAN, experience, and boundary checks run in both engines.
+CI builds this web revision with a pinned signaling coordinator and runs the
+same sequence. The separate Web job checks protocol vectors, unit tests,
+dependency audit, and the production build.
+
+See the [comprehensive verification report](docs/superpowers/reports/2026-10-05-bonjou-comprehensive-e2e.md)
+for results, corrected issues, retained failure evidence, and coverage limits.
 
 ## Protocol changes
 

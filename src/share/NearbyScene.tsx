@@ -26,7 +26,11 @@ const status: Record<Phase, string> = {
 };
 
 /** An explicitly labelled demonstration, with no connection or payload side effects. */
-export function NearbyScene() {
+export function NearbyScene({
+  filename = "Lunch photos.zip",
+}: {
+  filename?: string;
+}) {
   const frame = useRef<HTMLDivElement>(null);
   const packet = useRef<HTMLDivElement>(null);
   const figure = useRef<HTMLElement>(null);
@@ -204,7 +208,7 @@ export function NearbyScene() {
             width="1600"
             height="1400"
             alt="A silver laptop and phone sharing a file on a sunlit desk."
-            fetchPriority="high"
+            loading="lazy"
           />
           <div className="scene-label">
             <span /> Same Wi-Fi. Just a little closer.
@@ -218,7 +222,7 @@ export function NearbyScene() {
               )}
             </div>
             <div className="demo-file-copy">
-              <strong>Lunch photos.zip</strong>
+              <strong>{filename}</strong>
               <span key={phase}>{status[phase]}</span>
               <Progress
                 className="demo-progress h-0.5"
@@ -236,7 +240,7 @@ export function NearbyScene() {
       </div>
       <figcaption className="demo-controls">
         <div>
-          <span className="demo-label">Sharing demo</span>
+          <span className="demo-label">Illustrated handoff</span>
           <p aria-live="off" data-demo-caption>
             {captions[phase]}
           </p>
@@ -271,8 +275,8 @@ export function NearbyScene() {
         </Button>
       </figcaption>
       <p className="bj-sr">
-        Illustrative demo: the recipient approves the offer, then the photos
-        travel directly from the laptop to the phone.
+        Illustrative demo: the recipient approves the offer, then the file
+        travels directly from the laptop to the phone.
       </p>
     </figure>
   );

@@ -9,8 +9,7 @@ import {
   DrawerFooter,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { Input } from "@/components/ui/input";
-import { Composer } from "./Composer";
+import { Composer, type ComposerRef } from "./Composer";
 import { FileIcon } from "./FileIcon";
 import { NameGate } from "./NameGate";
 import { Palette } from "./Palette";
@@ -61,6 +60,49 @@ export function Workspace(props: WorkspaceProps) {
   const [transfersOpen, setTransfersOpen] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [roomOpen, setRoomOpen] = useState(false);
+  const [deferredOffers, setDeferredOffers] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [reviewOffers, setReviewOffers] = useState(false);
+  const reviewButton = useRef<HTMLButtonElement>(null);
+  const workspace = useRef<HTMLElement>(null);
+  const overlayOrigin = useRef<HTMLElement | null>(null);
+  const rememberOverlayOrigin = useCallback(
+    (element: Element | null = document.activeElement) => {
+      if (
+        element instanceof HTMLElement &&
+        element !== document.body &&
+        !element.closest('[role="dialog"]')
+      )
+        overlayOrigin.current = element;
+    },
+    [],
+  );
+  const restoreOverlayFocus = useCallback((event: Event) => {
+    // These overlays are opened by application actions rather than Radix
+    // Triggers. Keep their stable workspace origin across palette actions.
+    event.preventDefault();
+    if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+    const root = workspace.current;
+    if (!root || root.hidden) return;
+    const available = (element: HTMLElement | null): element is HTMLElement =>
+      Boolean(
+        element?.isConnected &&
+        element.getClientRects().length &&
+        !element.closest('[hidden], [inert], [aria-hidden="true"]') &&
+        !element.hasAttribute("disabled") &&
+        getComputedStyle(element).visibility !== "hidden",
+      );
+    const target = available(overlayOrigin.current)
+      ? overlayOrigin.current
+      : [
+          reviewButton.current,
+          ...root.querySelectorAll<HTMLElement>(
+            ".rail-cmd, .thread-tools button, button, a[href], input, textarea",
+          ),
+        ].find(available);
+    target?.focus({ preventScroll: true });
+  }, []);
   useEffect(() => {
     if (session.roomError || session.roomPending) setRoomOpen(true);
   }, [session.roomError, session.roomPending]);
@@ -81,9 +123,9 @@ export function Workspace(props: WorkspaceProps) {
   // interruption rather than a help.
   const narrow = useMediaQuery("(max-width: 860px)");
 
-  const fileInput = useRef<HTMLInputElement | null>(null);
-  const folderInput = useRef<HTMLInputElement | null>(null);
+  const composer = useRef<ComposerRef>(null);
   const announced = useRef(new Set<string>());
+  const [knownLabels, setKnownLabels] = useState<Record<string, string>>({});
 
   const selectThread = useCallback((id: string) => {
     setActiveId(id);
@@ -94,7 +136,7 @@ export function Workspace(props: WorkspaceProps) {
   // shares, so several peers legitimately arrive called the same thing.
   // Number the duplicates. Hex would be exact but reads as a serial
   // number, and nobody picks a person out of a list that way.
-  const labels = useMemo(() => {
+  const currentLabels = useMemo(() => {
     const counts = new Map<string, number>();
     for (const peer of session.peers) {
       counts.set(peer.name, (counts.get(peer.name) ?? 0) + 1);
@@ -113,13 +155,21 @@ export function Workspace(props: WorkspaceProps) {
     return out;
   }, [session.peers]);
 
-  // A thread whose peer has left would otherwise strand the composer with
-  // nobody to send to.
+  // Preserve a departed person's label and private conversation. Switching
+  // to Everyone would silently change the audience of prepared files.
   useEffect(() => {
-    if (activeId === EVERYONE || activeId === "received") return;
-    if (!session.peers.some((peer) => peer.id === activeId))
-      setActiveId(EVERYONE);
-  }, [session.peers, activeId]);
+    setKnownLabels((previous) =>
+      Object.entries(currentLabels).some(
+        ([id, label]) => previous[id] !== label,
+      )
+        ? { ...previous, ...currentLabels }
+        : previous,
+    );
+  }, [currentLabels]);
+  const labels = useMemo(
+    () => ({ ...knownLabels, ...currentLabels }),
+    [knownLabels, currentLabels],
+  );
 
   const { markRead } = session;
   useEffect(() => {
@@ -164,6 +214,9 @@ export function Workspace(props: WorkspaceProps) {
   }, [activeId, session.peers, broadcast]);
 
   const activePeer = session.peers.find((peer) => peer.id === activeId);
+  const unavailable =
+    activeId !== EVERYONE && activeId !== "received" && !activePeer;
+  const recipientNames = targets.map((id) => labels[id] ?? "Unknown person");
 
   const destination =
     activeId === EVERYONE
@@ -172,7 +225,7 @@ export function Workspace(props: WorkspaceProps) {
         : inRoom
           ? `room ${session.code}`
           : "everyone"
-      : (labels[activeId] ?? "");
+      : (labels[activeId] ?? "this person");
 
   const title =
     activeId === EVERYONE
@@ -181,7 +234,7 @@ export function Workspace(props: WorkspaceProps) {
         : "Everyone here"
       : activeId === "received"
         ? "Received files"
-        : (labels[activeId] ?? "Received");
+        : (labels[activeId] ?? "Conversation");
 
   const subtitle = threadSubtitle(
     activeId,
@@ -209,18 +262,29 @@ export function Workspace(props: WorkspaceProps) {
     [session.events, labels],
   );
 
-  // The newest offer still waiting on an answer. On a phone it is raised
-  // into a sheet, because a decision buried in a scrolled thread is one
-  // people miss.
-  const pendingOffer = useMemo(() => {
-    let latest: IncomingItem | null = null;
+  // Keep pending offers discoverable without forcing an immediate decision.
+  const pendingOffers = useMemo(() => {
+    const items: IncomingItem[] = [];
     for (const event of session.events) {
       if (event.kind !== "incoming") continue;
       if (event.item.state !== "pending") continue;
-      if (!latest || event.item.at > latest.at) latest = event.item;
+      items.push(event.item);
     }
-    return latest;
+    return items;
   }, [session.events]);
+  const pendingOffer = reviewOffers
+    ? pendingOffers[0]
+    : pendingOffers.find((item) => !deferredOffers.has(item.requestId));
+  const deferOffers = () => {
+    setDeferredOffers(
+      (current) =>
+        new Set([...current, ...pendingOffers.map((item) => item.requestId)]),
+    );
+    setReviewOffers(false);
+  };
+  useEffect(() => {
+    if (pendingOffers.length === 0) setReviewOffers(false);
+  }, [pendingOffers.length]);
 
   const copyLink = useCallback(() => {
     session.setNotice("Room link copied.");
@@ -231,12 +295,13 @@ export function Workspace(props: WorkspaceProps) {
       if (!visible) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
+        rememberOverlayOrigin();
         setPalette((open) => !open);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [visible]);
+  }, [visible, rememberOverlayOrigin]);
 
   if (!name) return visible ? <NameGate onName={onName} /> : null;
 
@@ -244,14 +309,41 @@ export function Workspace(props: WorkspaceProps) {
   const classes = [
     "workspace",
     `is-${mobileView}`,
+    narrow && pendingOffers.length > 0 ? "has-pending" : "",
     settings.compact ? "is-compact" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   return (
-    <main className={classes} hidden={!visible}>
+    <main
+      ref={workspace}
+      className={classes}
+      hidden={!visible}
+      onFocusCapture={(event) => rememberOverlayOrigin(event.target)}
+      onClickCapture={(event) => {
+        if (event.target instanceof Element)
+          rememberOverlayOrigin(
+            event.target.closest(
+              "button, a[href], input, textarea, [tabindex]",
+            ),
+          );
+      }}
+    >
       <h1 className="bj-sr">Bonjou workspace</h1>
+      {narrow && pendingOffers.length > 0 ? (
+        <div className="pending-review px-4 py-2">
+          <Button
+            ref={reviewButton}
+            variant="outline"
+            className="h-11 w-full"
+            onClick={() => setReviewOffers(true)}
+          >
+            Review {pendingOffers.length} pending{" "}
+            {pendingOffers.length === 1 ? "file" : "files"}
+          </Button>
+        </div>
+      ) : null}
       <Rail
         name={name}
         status={session.status}
@@ -292,64 +384,44 @@ export function Workspace(props: WorkspaceProps) {
           onRoom={() => setRoomOpen(true)}
           onRetry={session.retryConnection}
           verified={Boolean(activePeer && isVerified(activePeer.pubkey))}
+          unavailable={unavailable}
+          onChooseRecipient={() => setPalette(true)}
         />
 
-        {activeId === "received" || targets.length === 0 ? null : (
+        <div
+          hidden={activeId === "received"}
+          className="composer-shell bj-scroll"
+          tabIndex={0}
+          role="region"
+          aria-label="Message and file preparation"
+        >
           <Composer
-            key={activeId}
+            ref={composer}
+            threadId={activeId}
             draft={drafts[activeId] ?? ""}
             onDraft={(value) =>
               setDrafts((current) => ({ ...current, [activeId]: value }))
             }
             targets={targets}
             destination={destination}
+            recipientNames={recipientNames}
             onSendText={session.sendText}
             onSendFiles={session.sendFiles}
           />
-        )}
+        </div>
       </div>
-
-      {/* Driven from the palette, which has no file control of its own. */}
-      <Input
-        ref={fileInput}
-        type="file"
-        multiple
-        tabIndex={-1}
-        disabled={targets.length === 0}
-        className="bj-sr"
-        aria-label="Choose files to send"
-        onChange={(event) => {
-          const files = [...(event.target.files ?? [])];
-          if (files.length) session.sendFiles(targets, files);
-          event.target.value = "";
-        }}
-      />
-      <Input
-        ref={folderInput}
-        type="file"
-        multiple
-        tabIndex={-1}
-        disabled={targets.length === 0}
-        className="bj-sr"
-        aria-label="Choose a folder to send"
-        {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
-        onChange={(event) => {
-          const files = [...(event.target.files ?? [])];
-          if (files.length) session.sendFiles(targets, files, true);
-          event.target.value = "";
-        }}
-      />
 
       <Palette
         open={palette}
         onOpenChange={setPalette}
+        onCloseAutoFocus={restoreOverlayFocus}
         peers={session.peers}
         labels={labels}
         canVerify={canVerify}
-        canSend={targets.length > 0}
+        canSend={activeId !== "received"}
         onSelectThread={selectThread}
-        onPickFiles={() => fileInput.current?.click()}
-        onPickFolder={() => folderInput.current?.click()}
+        onPickFiles={() => composer.current?.openFiles()}
+        onPickFolder={() => composer.current?.openFolder()}
         onRoom={() => setRoomOpen(true)}
         onVerify={() => setVerifyOpen(true)}
         onToggleTheme={onToggleTheme}
@@ -360,6 +432,7 @@ export function Workspace(props: WorkspaceProps) {
       <VerifyDialog
         open={verifyOpen}
         onOpenChange={setVerifyOpen}
+        onCloseAutoFocus={restoreOverlayFocus}
         peerName={activePeer ? (labels[activePeer.id] ?? activePeer.name) : ""}
         fingerprint={
           activePeer ? (session.fingerprints[activePeer.id] ?? "") : ""
@@ -371,6 +444,7 @@ export function Workspace(props: WorkspaceProps) {
       <RoomDialog
         open={roomOpen}
         onOpenChange={setRoomOpen}
+        onCloseAutoFocus={restoreOverlayFocus}
         code={session.code}
         onCreate={session.createRoom}
         onJoin={session.joinRoom}
@@ -386,6 +460,7 @@ export function Workspace(props: WorkspaceProps) {
       <SettingsPanel
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+        onCloseAutoFocus={restoreOverlayFocus}
         name={name}
         onName={onName}
         themeChoice={themeChoice}
@@ -400,34 +475,58 @@ export function Workspace(props: WorkspaceProps) {
       <TransfersPanel
         open={transfersOpen}
         onOpenChange={setTransfersOpen}
+        onCloseAutoFocus={restoreOverlayFocus}
         entries={history}
       />
 
       {pendingOffer && narrow && visible ? (
-        <Drawer open shouldScaleBackground={false} dismissible={false}>
-          <DrawerContent className="sheet pb-[env(safe-area-inset-bottom)]">
-            <DrawerHeader className="text-left">
-              <DrawerTitle className="text-lg">
-                {labels[pendingOffer.from] ?? pendingOffer.fromName} is offering
-              </DrawerTitle>
-              <p className="sheet-name mt-2 text-lg font-semibold">
-                <FileIcon
-                  name={pendingOffer.name}
-                  folder={Boolean(pendingOffer.note)}
-                  size={22}
-                />
-                {pendingOffer.name}
+        <Drawer
+          open
+          shouldScaleBackground={false}
+          onOpenChange={(open) => {
+            if (!open) deferOffers();
+          }}
+        >
+          <DrawerContent
+            className="sheet overflow-hidden pb-[env(safe-area-inset-bottom)]"
+            onCloseAutoFocus={(event) => {
+              // Reviewing an offer is the useful return destination after
+              // deferral, provided another dialog has not taken its place.
+              if (reviewButton.current)
+                overlayOrigin.current = reviewButton.current;
+              restoreOverlayFocus(event);
+            }}
+          >
+            <div
+              className="offer-details min-h-0 overflow-y-auto"
+              tabIndex={0}
+              role="region"
+              aria-label="File offer details"
+            >
+              <DrawerHeader className="text-left">
+                <DrawerTitle className="text-lg">
+                  {labels[pendingOffer.from] ?? pendingOffer.fromName} is
+                  offering
+                </DrawerTitle>
+                <p className="sheet-name mt-2 text-lg font-semibold">
+                  <FileIcon
+                    name={pendingOffer.name}
+                    folder={Boolean(pendingOffer.note)}
+                    size={22}
+                  />
+                  {pendingOffer.name}
+                </p>
+                <DrawerDescription className="sheet-meta">
+                  {formatBytes(pendingOffer.size)}
+                  {pendingOffer.note ? ` · ${pendingOffer.note}` : ""}
+                </DrawerDescription>
+              </DrawerHeader>
+              <p className="px-4 text-sm leading-relaxed text-muted-foreground">
+                Nothing has downloaded yet. The bytes are still on their
+                machine, and approving is what starts the transfer.
               </p>
-              <DrawerDescription className="sheet-meta">
-                {formatBytes(pendingOffer.size)}
-                {pendingOffer.note ? ` · ${pendingOffer.note}` : ""}
-              </DrawerDescription>
-            </DrawerHeader>
-            <p className="px-4 text-sm leading-relaxed text-muted-foreground">
-              Nothing has downloaded yet. The bytes are still on their machine,
-              and approving is what starts the transfer.
-            </p>
-            <DrawerFooter>
+            </div>
+            <DrawerFooter className="offer-actions shrink-0">
               <Button
                 type="button"
                 className="h-12 px-6 text-[0.9375rem]"
@@ -442,6 +541,14 @@ export function Workspace(props: WorkspaceProps) {
                 onClick={() => session.decline(pendingOffer)}
               >
                 Decline
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-11"
+                onClick={deferOffers}
+              >
+                Decide later
               </Button>
             </DrawerFooter>
           </DrawerContent>

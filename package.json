@@ -16,7 +16,14 @@
     "e2e:accessibility": "node scripts/e2e-accessibility.mjs",
     "e2e:motion": "node scripts/e2e-motion.mjs",
     "generate:brand": "node scripts/build-brand-assets.mjs",
-    "check:protocol": "node scripts/check-protocol-vectors.mjs"
+    "check:protocol": "node scripts/check-protocol-vectors.mjs",
+    "e2e:polish": "node scripts/e2e-polish.mjs",
+    "e2e:resilience": "node scripts/e2e-resilience.mjs",
+    "e2e:experience": "node scripts/e2e-experience.mjs",
+    "e2e:staging": "node scripts/e2e-staging.mjs",
+    "e2e:boundaries": "node scripts/e2e-boundaries.mjs",
+    "e2e:cross-browser": "node scripts/e2e-cross-browser.mjs",
+    "e2e:all": "node scripts/e2e-all.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist-mono": "^5.3.0",
@@ -43,7 +50,6 @@
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "playwright": "^1.63.0",
-    "shadcn": "^4.19.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.8.3",
     "vite": "^8.3.0",

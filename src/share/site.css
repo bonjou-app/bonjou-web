@@ -158,7 +158,7 @@
 }
 .hero-scene {
   position: relative;
-  width: calc(100% + 2rem);
+  width: 100%;
   margin-left: 0;
   min-width: 0;
 }
@@ -543,9 +543,6 @@
 @media (max-width: 1050px) {
   .masthead nav {
     gap: 1rem;
-  }
-  .hero-scene {
-    width: calc(100% + 2rem);
   }
   .hero-actions {
     flex-direction: column;

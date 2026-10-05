@@ -8,11 +8,21 @@ shipped design changes, not before.
 Two surfaces with a shared visual language. `/` introduces nearby sharing;
 `/app` opens the workspace; `/r/{code}` opens a room directly.
 
-The landing page has a static headline, a Blender-rendered device scene,
-three sharing steps, a plain explanation of privacy and network limits,
-CLI installation, and practical questions. It opens no coordinator connection
-and takes no session lock. The sharing engine is loaded on first entry to
-the workspace. A session and its conversation drafts survive a client-side
+The landing page leads with a usable handoff lab. Visitors choose an original
+sample or a local file, offer it, and approve or decline from a second view.
+Approval opens two native WebRTC endpoints in this browser; the received bytes
+are measured and hash-checked before a separate download action appears. This
+is a bounded local demonstration, not a test of another device or protocol v2.
+The transport module loads only on approval. A fresh homepage visit opens no
+coordinator connection and takes no session lock. Returning home from the app
+keeps its existing session active.
+
+Selectable study, studio, and shared-desk stories surround the Blender scene.
+A setup explorer changes its diagram and guidance for browser/CLI, network,
+and internet choices. Its explicit browser check tests local API presence and
+cryptography, not network reachability. CLI installation and practical questions
+remain available. The real sharing engine loads on first entry to the workspace.
+A session, conversation drafts, and staged file selections survive a client-side
 trip home and back.
 
 ## Theme
@@ -40,6 +50,11 @@ The cascade order is `theme, base, bonjou, components, utilities`.
 Base typography belongs in the base layer. Named page layouts belong in the
 Bonjou layer, before the library's utilities. Do not add custom button,
 input, tab, or card skins that override shadcn's component variants.
+The owned Button variants keep primary hover at 90% opacity for white-label
+contrast; text links use `--bj-acc-text`, which stays readable in both themes.
+Import page styles centrally from `src/index.css` after its layer declaration.
+A component stylesheet that establishes the Bonjou layer before the base layer
+can make Tailwind's reset override page typography and spacing.
 
 ## Typography
 
@@ -57,7 +72,7 @@ people, timestamps, labels, and controls use the sans family.
 Hierarchy comes from weight and size. The root is 16px; regular UI labels
 are 14px, chat and supporting prose are 15–16px, and secondary metadata is
 12–13px. Marketing headings are fluid and use weights 650–700. The hero
-uses -0.045em tracking, and section headings use -0.04em. Avoid the earlier
+uses -0.06em tracking, and section headings use -0.04em. Avoid the earlier
 cramped -0.075em headline spacing. Workspace headings use fixed rem sizes.
 The headline reveals by line without changing its text or its reserved
 layout. Body measure caps around 65ch.
@@ -84,8 +99,6 @@ The CLI repository's `docs/assets/bonjou-mark.svg` and `docs/assets/logo.png`,
 and the organization profile's `profile/assets/`, are copies of these exports.
 Update those copies together when the approved mark changes. Check the 16px
 and 32px icons, both themes, and the mobile masthead before publishing.
-
-
 
 Two sets, doing two different jobs.
 
@@ -118,9 +131,11 @@ in the script if a type worth distinguishing is missing.
 ## Layout
 
 - The marketing page shares a centered content area and consistent
-  responsive gutters, with a maximum content width of 1280px. An animated
-  headline sits beside the device scene. Content uses prose, ordered steps,
-  and disclosure instead of repeated feature cards.
+  responsive gutters, with a maximum content width of 1280px. A fixed
+  headline sits beside the introduction, above a wide two-sided handoff lab.
+  Selectable stories, a vermilion consent interlude, and a changing network
+  diagram give the page distinct compositions. Content uses prose, ordered
+  steps, and disclosure instead of repeated feature cards.
 - The workspace has a 288px sidebar at desktop sizes and uses `100dvh`.
   The conversation is a flat, full-height surface with a subtle dividing line.
   Messages and the composer share a maximum width of 896px.
@@ -128,7 +143,7 @@ in the script if a type worth distinguishing is missing.
   The back control appears only in this layout.
 - Marketing navigation becomes a shadcn Sheet at 760px and below. Resizing back
   to desktop closes the sheet instead of hiding an active focus trap.
-- Empty conversations have a centered icon, heading, and useful next step.
+- Empty conversations have a centered original miniature, heading, and useful next step.
   Onboarding is a centered shadcn Card with a visible name label.
 - Use shadcn's built-in radius and variants. Primary controls are 40–48px;
   room actions and onboarding are at least 44px. Keep settings and dialogs
@@ -191,10 +206,28 @@ page CSS is restricted to layout and conversation-specific presentation.
 - **Pending offer.** The only row that asks for a decision. It stays in
   chronological position on a desktop; on a phone it is raised into a bottom
   sheet, because a decision buried in a scrolled thread is one people miss.
+  The sheet can be dismissed or deferred with Decide later. A pending-file
+  review button remains visible in both mobile panes, so approval can wait
+  without losing the offer. Deferring never starts a download.
 - **Composer.** Auto-growing textarea, attach controls, the destination
   spelled out, and a drop target across the whole shadcn Input Group. Drafts
   are kept per conversation and cleared only after successful sending. With
-  no recipients, the workspace presents invitation and connection help.
+  no recipients, the workspace keeps a usable local composer beside invitation
+  and connection help. File/folder picks, drops, and pasted clipboard files
+  enter a staging tray without sending an offer. The tray shows count, size,
+  file type, whole-folder batches, remove, and clear actions. Its Offer action
+  names the current destination and sends metadata only. The recipient still
+  approves before file payload streaming starts. Fully unsuccessful metadata
+  offers keep their batch available for retry. A batch offered successfully to
+  any recipient leaves staging; partial failures are recorded in the conversation
+  and reported to the sender. Staging is shared across
+  conversation changes; text drafts remain per conversation. Received files
+  hides the composer without destroying its selection. Palette file actions
+  use this same staging path.
+  Draft height is bounded by the viewport. The preparation region can scroll
+  in short windows, keeping file actions and Send reachable with a long draft.
+  A short placeholder keeps long recipient names from inflating an empty
+  composer. The full recipient remains in its label and destination line.
 - **Rooms.** Create and Join are separate shadcn Tabs. Created rooms show
   the copyable code and QR, plus an explicit Leave room action. Joining
   requires an explicit submit and keeps errors next to the code field.
@@ -202,6 +235,9 @@ page CSS is restricted to layout and conversation-specific presentation.
   verification and rooms, Sheet powers the right-hand settings and transfer
   panels, and Drawer raises pending offers on phones. Focus trapping, escape,
   labelling, and scroll locking stay inside the primitives.
+  Application actions explicitly return focus to their workspace origin;
+  opening another surface from the palette keeps that original focus target.
+  The conversation scroll area is a labeled, keyboard-focusable region.
 
 ## Honesty rules
 
@@ -218,9 +254,16 @@ These are design rules because they are mostly enforced in the UI layer.
   bytes. The UI says to check browser downloads; it does not claim proof of
   disk persistence. History distinguishes pending, receiving, checking,
   completed, declined, and failed states.
+  The homepage lab measures its own receiving data channel and verifies the
+  completed Blob with SHA-256. It makes no claim about a remote device, LAN
+  speed, disk persistence, or the production protocol's authentication.
 - **No control that does nothing.** Every switch in settings is wired to
   something, and the notification switch only moves if the browser actually
   grants permission.
+- **Errors end on both devices.** Unsupported, rejected, or stalled download
+  preparation tells the sender that the transfer failed. Unreadable dropped
+  files stop the selection with a clear error rather than sending an
+  incomplete folder. Filename limits preserve the extension where possible.
 - **Install commands are verbatim from README.md.** They are executed as
   written, so they are never paraphrased, shortened, or pointed at a
   nicer-looking domain. If they drift, the README wins.
@@ -234,7 +277,7 @@ the viewport. Use `cubic-bezier(0.22, 1, 0.36, 1)` without bounce. Hover
 feedback moves links and icons a few pixels; a fine pointer tilts the desk
 by at most a few degrees. No interaction waits for an animation to finish.
 
-The scene's clearly labelled sharing demo lasts four seconds and plays once
+The scene's clearly labelled illustrated handoff lasts four seconds and plays once
 when mostly visible. It illustrates offer, approval, direct transfer, and
 receipt. Pause, resume, and replay controls are shadcn buttons. The packet
 and Radix progress indicator share a Web Animations timeline. The demo
@@ -281,10 +324,34 @@ a clothbound notebook, and a ceramic cup on a pale desktop. Both screens are
 actual Bonjou conversations captured by `scripts/capture-scene-screens.mjs`.
 The scene uses daylight, physical materials, and restrained color. The interactive
 annotations use existing Phosphor icons and are explicitly labelled as a
-sharing demonstration. The physical render stays the visual foundation.
+illustrated handoff. It appears within the selectable stories; the working lab
+is the first interactive surface. The physical render stays the visual foundation
+of those stories.
 
 Editable source, packed textures, and a reproduction guide live in
 `assets/nearby-scene/`. `scripts/render-nearby-scene.py` rebuilds the
 scene; `scripts/optimize-nearby-scene.py` exports 1600px and 800px WebP assets.
 The page reserves image dimensions and chooses a responsive source. The raw
 intermediate PNG is ignored; only optimized images ship to the browser.
+
+## Small artwork
+
+The paper-and-ribbon family adds original raster vignettes to the stories,
+consent interlude, and empty conversations/received list. Warm ivory paper,
+graphite objects, and a vermilion ribbon give notes, design swatches, project
+folders, nearby sharing, and an empty receiving tray the same tactile finish.
+These are decorative illustrations, not previews of selected files or live
+connection status. Material file icons still identify real payloads.
+
+The built-in image generator produced the source PNGs in
+`assets/bonjou-visuals/`. That directory records the exact prompts and
+generation method. The source images have genuine transparency; they are
+raster assets, not editable Blender models. The existing desk render retains
+its separate editable Blender source.
+
+`scripts/optimize-brand-artwork.py` exports alpha-preserving 256px and 512px
+WebP files to `public/images/bonjou/`. `BrandArtwork` uses responsive sources,
+reserved square dimensions, asynchronous decoding, lazy loading, and empty
+alt text where adjacent copy supplies the meaning. No animation or extra
+transport work is attached to these illustrations. The empty receiving tray
+contains no files or completion seal.

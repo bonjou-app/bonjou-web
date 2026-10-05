@@ -16,3 +16,5 @@ vite.config.d.ts
 .DS_Store
 .playwright-mcp/
 test-results/
+# Temporary coordinator checkout used by browser CI.
+.e2e-cli/

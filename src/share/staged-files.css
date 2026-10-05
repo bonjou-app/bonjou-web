@@ -1,0 +1,95 @@
+@layer bonjou {
+  .composer-shell {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .staging-tray {
+    max-width: 56rem;
+    margin: 0 auto 0.75rem;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+  }
+  .staging-head,
+  .staging-actions,
+  .staging-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .staging-head {
+    justify-content: space-between;
+  }
+  .staging-head p {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .staging-total {
+    margin-left: 0.625rem;
+    color: var(--muted-foreground);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+  .staging-scroll {
+    max-height: min(11rem, 22dvh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .staging-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .staging-row {
+    min-height: 3.5rem;
+    padding: 0.25rem 0;
+    border-top: 1px solid var(--border);
+  }
+  .staging-item {
+    flex: 1;
+    min-width: 0;
+  }
+  .staging-name,
+  .staging-detail,
+  .staging-caption span {
+    display: block;
+  }
+  .staging-name {
+    overflow-wrap: anywhere;
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+  .staging-detail,
+  .staging-caption {
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+  .staging-actions {
+    justify-content: space-between;
+    padding-top: 0.5rem;
+  }
+  .staging-caption {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .staging-feedback {
+    max-width: 56rem;
+    margin: 0.5rem auto 0;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+  @media (max-width: 540px) {
+    .staging-actions {
+      align-items: stretch;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .staging-scroll {
+      max-height: min(8rem, 19dvh);
+    }
+  }
+}
