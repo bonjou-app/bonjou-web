@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { ArrowRight } from "@phosphor-icons/react/dist/csr/ArrowRight";
 import { ArrowUpRight } from "@phosphor-icons/react/dist/csr/ArrowUpRight";
 import { Moon } from "@phosphor-icons/react/dist/csr/Moon";
@@ -49,6 +49,7 @@ export function Landing({
   const site = useRef<HTMLDivElement>(null);
   useLandingMotion(site);
   const [menu, setMenu] = useState(false);
+  const [faq, setFaq] = useState("");
   const [labBusy, setLabBusy] = useState(false);
   const [sampleRequest, setSampleRequest] = useState<{
     id: DemoSampleId;
@@ -66,6 +67,19 @@ export function Landing({
         : "smooth",
       block: "start",
     });
+  };
+  const followApp = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    )
+      return;
+    event.preventDefault();
+    onOpenApp();
   };
   const narrow = useMediaQuery("(max-width: 760px)");
   useEffect(() => {
@@ -99,10 +113,12 @@ export function Landing({
             {theme === "dark" ? <Sun /> : <Moon />}
           </Button>
           <Button
+            asChild
             className="hidden min-[761px]:inline-flex h-11 px-4"
-            onClick={onOpenApp}
           >
-            Open Bonjou <ArrowUpRight />
+            <a href="/app" onClick={followApp}>
+              Open Bonjou <ArrowUpRight />
+            </a>
           </Button>
           {narrow ? (
             <Sheet open={menu} onOpenChange={setMenu}>
@@ -165,14 +181,16 @@ export function Landing({
             </div>
             <div className="hero-intro-copy">
               <p>
-                Good notes. The next concept. A whole project.
+                Send files, folders, and messages directly
                 <br />
-                Straight to someone on your Wi-Fi.
+                to another device on your Wi-Fi.
               </p>
               <div className="hero-actions">
-                <Button onClick={onOpenApp} className="h-12 px-6 text-base">
-                  Start sharing
-                  <ArrowRight />
+                <Button asChild className="h-12 px-6 text-base">
+                  <a href="/app" onClick={followApp}>
+                    Start sharing
+                    <ArrowRight />
+                  </a>
                 </Button>
                 <span>No account. No installation.</span>
               </div>
@@ -231,12 +249,14 @@ export function Landing({
               <strong>Approve</strong>
             </div>
             <Button
+              asChild
               variant="secondary"
               className="h-12 px-6"
-              onClick={onOpenApp}
             >
-              Prepare files in Bonjou
-              <ArrowUpRight />
+              <a href="/app" onClick={followApp}>
+                Prepare files in Bonjou
+                <ArrowUpRight />
+              </a>
             </Button>
           </div>
         </section>
@@ -263,12 +283,18 @@ export function Landing({
               little details.
             </h2>
           </div>
-          <Accordion type="single" collapsible className="faq-list">
+          <Accordion
+            type="single"
+            collapsible
+            value={faq}
+            onValueChange={setFaq}
+            className="faq-list"
+          >
             <AccordionItem value="network">
               <AccordionTrigger>
                 Do we need to be on the same Wi-Fi?
               </AccordionTrigger>
-              <AccordionContent>
+              <AccordionContent forceMount hidden={faq !== "network"}>
                 Yes, or the same reachable local network, such as Ethernet
                 connected to your Wi-Fi router. Room codes create a smaller
                 group on that network. They don&rsquo;t send files over the
@@ -279,7 +305,7 @@ export function Landing({
               <AccordionTrigger>
                 Does the web app need internet?
               </AccordionTrigger>
-              <AccordionContent>
+              <AccordionContent forceMount hidden={faq !== "internet"}>
                 Yes. Browsers use an online coordinator to discover nearby
                 candidates and exchange encrypted connection information.
                 Messages and files still travel directly. For fully offline
@@ -288,7 +314,7 @@ export function Landing({
             </AccordionItem>
             <AccordionItem value="files">
               <AccordionTrigger>Where do received files go?</AccordionTrigger>
-              <AccordionContent>
+              <AccordionContent forceMount hidden={faq !== "files"}>
                 Check your browser&rsquo;s downloads after you accept. Folders
                 arrive as ZIP archives. Bonjou keeps the transfer list and
                 messages for this session only. Files you save are separate from
@@ -299,7 +325,7 @@ export function Landing({
               <AccordionTrigger>
                 Why can&rsquo;t I see the other person?
               </AccordionTrigger>
-              <AccordionContent>
+              <AccordionContent forceMount hidden={faq !== "connection"}>
                 Check that both devices are on the same network, allow local
                 network access if your browser asks, and temporarily disconnect
                 a VPN. Some guest and office networks block direct connections.
@@ -310,7 +336,7 @@ export function Landing({
               <AccordionTrigger>
                 How do I know who I&rsquo;m sharing with?
               </AccordionTrigger>
-              <AccordionContent>
+              <AccordionContent forceMount hidden={faq !== "identity"}>
                 Names help you find each other, but anyone can choose a name.
                 Open a person&rsquo;s conversation and compare the security
                 codes with them in person before sending anything sensitive.
@@ -327,8 +353,10 @@ export function Landing({
               starts right here.
             </h2>
           </div>
-          <Button onClick={onOpenApp} className="h-12 px-6 text-base">
-            Open Bonjou <ArrowRight />
+          <Button asChild className="h-12 px-6 text-base">
+            <a href="/app" onClick={followApp}>
+              Open Bonjou <ArrowRight />
+            </a>
           </Button>
         </section>
       </main>

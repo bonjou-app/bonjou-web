@@ -41,7 +41,7 @@ try {
     await page.setViewportSize({ width: 390, height: 844 });
     await check(page, `mobile landing ${theme}`);
     await page
-      .getByRole("button", { name: "Start sharing", exact: true })
+      .getByRole("link", { name: "Start sharing", exact: true })
       .click();
     await page.getByLabel("Your display name").waitFor();
     await check(page, `onboarding ${theme}`);

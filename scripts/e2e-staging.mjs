@@ -217,7 +217,7 @@ try {
   await select(sender, "Staging Bob");
   await sender.getByRole("link", { name: "Bonjou home" }).click();
   await sender
-    .getByRole("button", { name: "Start sharing", exact: true })
+    .getByRole("link", { name: "Start sharing", exact: true })
     .click();
   assert.deepEqual(
     await sender.locator(".staging-name").allTextContents(),

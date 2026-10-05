@@ -1,36 +1,53 @@
 import { fileURLToPath } from "node:url";
+import type { IncomingMessage, ServerResponse } from "node:http";
 
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
+
+import { isApplicationUrl, renderMetadata } from "./src/share/seo.ts";
 
 const entry = (name: string) => fileURLToPath(new URL(name, import.meta.url));
 
 /**
  * Mirrors the rewrites in vercel.json.
  *
- * Production serves index.html for "/", "/app", and "/r/{code}". Without
- * the same mapping here, the dev server 404s on every one of those and the
- * client router can only be exercised against a real deploy.
+ * The public homepage and private workspace have different indexing policies.
+ * Mirror production routes in both development and the built preview.
  */
-const rewrites = () => ({
+const rewrites = (): Plugin => ({
   name: "bonjou-rewrites",
-  configureServer(server: { middlewares: { use: (fn: Middleware) => void } }) {
-    server.middlewares.use((req, _res, next) => {
-      const path = (req.url ?? "").split("?")[0];
-      if (path === "/app" || path === "/share" || /^\/r\//.test(path)) {
-        req.url = "/index.html";
-      }
-      next();
-    });
+  configureServer(server) {
+    server.middlewares.use(applicationRewrite(false));
+  },
+  configurePreviewServer(server) {
+    server.middlewares.use(applicationRewrite(true));
+  },
+  transformIndexHtml: {
+    order: "pre",
+    handler(html, context) {
+      const url = new URL(
+        context.originalUrl ?? context.path,
+        "http://bonjou.invalid",
+      );
+      return html.replace(
+        "<!--seo-metadata-->",
+        renderMetadata(isApplicationUrl(url.pathname, url.search)),
+      );
+    },
   },
 });
 
-type Middleware = (
-  req: { url?: string },
-  res: unknown,
-  next: () => void,
-) => void;
+function applicationRewrite(preview: boolean) {
+  return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    const url = new URL(req.url ?? "/", "http://bonjou.invalid");
+    if (isApplicationUrl(url.pathname, url.search)) {
+      res.setHeader("X-Robots-Tag", "noindex, follow");
+      req.url = `${preview ? "/app-shell.html" : "/index.html"}${url.search}`;
+    }
+    next();
+  };
+}
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), rewrites()],

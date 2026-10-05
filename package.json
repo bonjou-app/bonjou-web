@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "generate:demo": "python3 scripts/generate-demo-gif.py",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/prerender.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "smoke": "node scripts/smoke-coordinator.mjs",
@@ -17,6 +17,7 @@
     "e2e:motion": "node scripts/e2e-motion.mjs",
     "generate:brand": "node scripts/build-brand-assets.mjs",
     "check:protocol": "node scripts/check-protocol-vectors.mjs",
+    "check:seo": "node scripts/check-seo.mjs",
     "e2e:polish": "node scripts/e2e-polish.mjs",
     "e2e:resilience": "node scripts/e2e-resilience.mjs",
     "e2e:experience": "node scripts/e2e-experience.mjs",

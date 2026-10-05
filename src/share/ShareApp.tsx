@@ -6,6 +6,7 @@ import { Workspace } from "./Workspace";
 import { useSessionOwnership } from "./tabs";
 import type { useTheme } from "./theme";
 import { sanitizePeerName, useSession } from "./useSession";
+import { isApplicationUrl } from "./seo";
 
 function storedName() {
   try {
@@ -31,10 +32,7 @@ export default function ShareApp({
   const owns = ownership.state === "owner";
   const session = useSession(name, Boolean(name) && owns);
   useEffect(() => {
-    const appRoute =
-      /^\/(app|share)(\/|$)/.test(location.pathname) ||
-      location.pathname.startsWith("/r/") ||
-      Boolean(new URLSearchParams(location.search).get("r"));
+    const appRoute = isApplicationUrl(location.pathname, location.search);
     if (
       visible &&
       owns &&

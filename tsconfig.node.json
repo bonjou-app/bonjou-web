@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
+    "rewriteRelativeImportExtensions": true,
     // A composite project has to emit, so it emits somewhere harmless.
     // The default put vite.config.js beside the source, and Vite resolves
     // .js before .ts, so the build artifact silently shadowed the real
@@ -17,6 +18,7 @@
     ]
   },
   "include": [
-    "vite.config.ts"
+    "vite.config.ts",
+    "src/share/seo.ts"
   ]
 }

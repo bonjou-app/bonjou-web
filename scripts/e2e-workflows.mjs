@@ -103,7 +103,7 @@ try {
     .waitFor();
   assert.equal(await alice.locator(".workspace").isVisible(), false);
   await alice
-    .getByRole("button", { name: "Start sharing", exact: true })
+    .getByRole("link", { name: "Start sharing", exact: true })
     .click();
   assert.equal(await alice.locator("textarea").inputValue(), "A draft for Bob");
   await alice
@@ -321,7 +321,7 @@ try {
   await closeDialog(bob);
   await alice.getByRole("link", { name: "Bonjou home" }).click();
   await alice
-    .getByRole("button", { name: "Start sharing", exact: true })
+    .getByRole("link", { name: "Start sharing", exact: true })
     .click();
   assert.equal(new URL(alice.url()).pathname, `/r/${currentCode}`);
   await alice.goBack();
@@ -341,7 +341,7 @@ try {
   assert.equal(new URL(alice.url()).pathname, "/");
   assert.equal(await alice.locator(".workspace").isVisible(), false);
   await alice
-    .getByRole("button", { name: "Start sharing", exact: true })
+    .getByRole("link", { name: "Start sharing", exact: true })
     .click();
   assert.equal(new URL(alice.url()).pathname, `/r/${currentCode}`);
   await alice.locator(".rail-room-open").click();
@@ -388,7 +388,7 @@ try {
     false,
   );
   await landing
-    .getByRole("button", { name: "Start sharing", exact: true })
+    .getByRole("link", { name: "Start sharing", exact: true })
     .click();
   await landing.getByRole("heading", { name: /Bonjou is running/ }).waitFor();
   await landing.getByRole("button", { name: "Use it in this tab" }).click();
