@@ -856,17 +856,30 @@ export function useSession(name: string, active: boolean) {
           void client.sendSignal(peerId, signal).catch(() => undefined);
         },
         (link) => {
+          const isCurrent = () => linksRef.current?.peek(link.peerId) === link;
           link.listen({
-            onOpen: () =>
-              link.sendControl({ t: "profile", name: nameRef.current }),
-            onControl: (message) => handleControl(link.peerId, message),
+            onOpen: () => {
+              if (isCurrent())
+                link.sendControl({ t: "profile", name: nameRef.current });
+            },
+            onControl: (message) => {
+              if (isCurrent()) handleControl(link.peerId, message);
+            },
             onPayloadOpen: (requestId) =>
-              handlePayloadOpen(link.peerId, requestId),
+              isCurrent()
+                ? handlePayloadOpen(link.peerId, requestId)
+                : undefined,
             onPayloadData: (requestId, bytes) =>
-              handlePayloadData(link.peerId, requestId, bytes),
-            onPayloadClosed: handlePayloadClosed,
+              isCurrent()
+                ? handlePayloadData(link.peerId, requestId, bytes)
+                : undefined,
+            onPayloadClosed: (requestId) => {
+              if (isCurrent()) handlePayloadClosed(requestId);
+            },
           });
-          link.onDisconnect(() => handleLinkClosed(link.peerId));
+          link.onDisconnect(() => {
+            if (isCurrent()) handleLinkClosed(link.peerId);
+          });
         },
       );
     }

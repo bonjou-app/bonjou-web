@@ -12,21 +12,25 @@ function errorSummary(error) {
   const message = String(error?.message ?? "").toLowerCase();
   return {
     name: /^[A-Za-z]+Error$/.test(name) ? name : "Error",
-    category: /ice|candidate/.test(message)
-      ? "ice-candidate"
-      : /sdp|description/.test(message)
-        ? "session-description"
-        : /state|closed/.test(message)
-          ? "state"
-          : /service.worker|download helper/.test(message)
-            ? "download-helper"
-            : /crypto|decrypt|encrypt|key/.test(message)
-              ? "cryptography"
-              : /network|socket|connection/.test(message)
-                ? "network"
-                : /timeout|timed out/.test(message)
-                  ? "timeout"
-                  : "other",
+    category: /localstorage|sessionstorage|storage|property.?access/.test(
+      message,
+    )
+      ? "storage"
+      : /ice|candidate/.test(message)
+        ? "ice-candidate"
+        : /sdp|description/.test(message)
+          ? "session-description"
+          : /state|closed/.test(message)
+            ? "state"
+            : /service.worker|download helper/.test(message)
+              ? "download-helper"
+              : /crypto|decrypt|encrypt|key/.test(message)
+                ? "cryptography"
+                : /network|socket|connection/.test(message)
+                  ? "network"
+                  : /timeout|timed out/.test(message)
+                    ? "timeout"
+                    : "other",
   };
 }
 
@@ -97,6 +101,26 @@ function installNativeRtcDiagnostics() {
     counts[kind] = Math.min((counts[kind] ?? 0) + 1, 9999);
     record({ peer: item.id, event: "candidate", direction, ...summary });
   };
+  const controlKinds = new Set([
+    "profile",
+    "envelope",
+    "ready",
+    "credit",
+    "complete",
+    "end",
+    "abort",
+  ]);
+  const controlKind = (data) => {
+    // Do not inspect binary buffers or parse unbounded message bodies. Only
+    // the public outer discriminator survives this observational read.
+    if (typeof data !== "string" || data.length > 64 * 1024) return "other";
+    try {
+      const frame = JSON.parse(data);
+      return controlKinds.has(frame?.t) ? frame.t : "other";
+    } catch {
+      return "other";
+    }
+  };
   const observePeer = (peer) => {
     if (peers.length === 32) {
       omittedPeers += 1;
@@ -155,7 +179,13 @@ function installNativeRtcDiagnostics() {
         state: channel.readyState,
       };
       item.channels.push(channelItem);
-      record({ peer: item.id, event: "channel-created", ...channelItem });
+      const channelState = () => ({
+        id: channelItem.id,
+        kind: channelItem.kind,
+        direction: channelItem.direction,
+        state: channelItem.state,
+      });
+      record({ peer: item.id, event: "channel-created", ...channelState() });
       for (const event of ["open", "close", "error"]) {
         channel.addEventListener(event, () =>
           observe(() => {
@@ -163,10 +193,42 @@ function installNativeRtcDiagnostics() {
             record({
               peer: item.id,
               event: `channel-${event}`,
-              ...channelItem,
+              ...channelState(),
             });
           }),
         );
+      }
+      if (channelItem.kind === "control") {
+        channelItem.messages = { sent: {}, received: {} };
+        const countControl = (direction, data) => {
+          const type = controlKind(data);
+          const counts = channelItem.messages[direction];
+          counts[type] = Math.min((counts[type] ?? 0) + 1, 9999);
+          record({
+            peer: item.id,
+            channel: channelItem.id,
+            event: "control-message",
+            direction,
+            type,
+          });
+        };
+        channel.addEventListener("message", (event) =>
+          observe(() => countControl("received", event.data)),
+        );
+        const nativeSend = channel.send;
+        Object.defineProperty(channel, "send", {
+          configurable: true,
+          writable: true,
+          value: new Proxy(nativeSend, {
+            apply(target, receiver, args) {
+              // Count only a successful native send, preserving its receiver,
+              // return value and any thrown error exactly as they were.
+              const result = Reflect.apply(target, receiver, args);
+              observe(() => countControl("sent", args[0]));
+              return result;
+            },
+          }),
+        });
       }
     };
     peer.addEventListener("datachannel", ({ channel }) =>
@@ -299,7 +361,9 @@ export function createRtcDiagnostics({ output, suite }) {
     "capacity",
     "rate_limited",
     "decrypt_failed",
-    "unsupported",
+    "no_peer",
+    "not_in_room",
+    "unsupported_message",
   ]);
   const trackPage = (page, label) => {
     const item = {
@@ -424,7 +488,7 @@ export function createRtcDiagnostics({ output, suite }) {
             `${JSON.stringify(evidence, null, 2)}\n`,
           );
           console.error(
-            `${suite} ${item.label} diagnostics: ${JSON.stringify({ sockets: item.sockets, pageErrors: item.pageErrors, peers: runtime.peers?.map(({ id, connection, ice, gathering, signaling, candidates }) => ({ id, connection, ice, gathering, signaling, candidates })), unavailable: runtime.unavailable })}`,
+            `${suite} ${item.label} diagnostics: ${JSON.stringify({ sockets: item.sockets, pageErrors: item.pageErrors, peers: runtime.peers?.map(({ id, connection, ice, gathering, signaling, candidates, channels }) => ({ id, connection, ice, gathering, signaling, candidates, controlChannels: channels.filter(({ kind }) => kind === "control") })), unavailable: runtime.unavailable })}`,
           );
         }),
       );

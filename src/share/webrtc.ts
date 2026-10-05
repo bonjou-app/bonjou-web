@@ -211,7 +211,7 @@ export class PeerLink {
   ) {}
 
   get open(): boolean {
-    return this.control?.readyState === "open";
+    return !this.closed && this.control?.readyState === "open";
   }
 
   listen(handlers: ChannelHandlers): void {
@@ -234,7 +234,13 @@ export class PeerLink {
     this.pc = pc;
 
     pc.onicecandidate = ({ candidate }) => {
-      if (!candidate || !isHostCandidate(candidate.toJSON())) return;
+      if (
+        this.closed ||
+        this.pc !== pc ||
+        !candidate ||
+        !isHostCandidate(candidate.toJSON())
+      )
+        return;
       this.send({
         kind: "rtc_ice",
         payload: JSON.stringify(candidate.toJSON()),
@@ -242,17 +248,21 @@ export class PeerLink {
     };
 
     pc.onnegotiationneeded = () => {
-      void this.negotiate();
+      if (!this.closed && this.pc === pc) void this.negotiate();
     };
 
     pc.onconnectionstatechange = () => {
+      if (this.closed || this.pc !== pc) return;
       if (pc.connectionState === "failed" || pc.connectionState === "closed") {
-        this.settleControl(false);
-        this.onClosed?.();
+        this.close();
       }
     };
 
     pc.ondatachannel = ({ channel }) => {
+      if (this.closed || this.pc !== pc) {
+        channel.close();
+        return;
+      }
       if (channel.label === CONTROL_LABEL) {
         this.adoptControl(channel);
         return;
@@ -274,6 +284,7 @@ export class PeerLink {
     try {
       this.makingOffer = true;
       await pc.setLocalDescription();
+      if (this.closed || this.pc !== pc) return;
       const description = pc.localDescription;
       if (!description) return;
       assertHostOnlyDescription(description);
@@ -289,22 +300,25 @@ export class PeerLink {
   }
 
   private adoptControl(channel: RTCDataChannel): void {
-    if (this.control) {
+    if (this.closed || this.control) {
       channel.close();
       return;
     }
     channel.binaryType = "arraybuffer";
     this.control = channel;
     channel.onopen = () => {
+      if (this.closed || this.control !== channel) return;
       this.settleControl(true);
       this.handlers?.onOpen();
     };
     channel.onclose = () => {
-      this.settleControl(false);
-      this.onClosed?.();
+      if (!this.closed && this.control === channel) this.close();
     };
-    channel.onerror = () => this.settleControl(false);
+    channel.onerror = () => {
+      if (!this.closed && this.control === channel) this.settleControl(false);
+    };
     channel.onmessage = (event) => {
+      if (this.closed || this.control !== channel) return;
       if (typeof event.data !== "string") return;
       const message = parseControl(event.data);
       if (!message) return;
@@ -323,14 +337,17 @@ export class PeerLink {
         return;
       }
       this.controlTail = this.controlTail
-        .then(() => this.handlers?.onControl(message))
+        .then(() => {
+          if (!this.closed && this.control === channel)
+            return this.handlers?.onControl(message);
+        })
         .then(() => undefined)
         .catch(() => undefined);
     };
   }
 
   private adoptPayload(requestId: string, channel: RTCDataChannel): void {
-    if (this.payloads.has(requestId)) {
+    if (this.closed || this.payloads.has(requestId)) {
       channel.close();
       return;
     }
@@ -348,10 +365,12 @@ export class PeerLink {
     this.flows.set(requestId, flow);
 
     channel.onopen = () => {
+      if (this.closed || this.payloads.get(requestId) !== channel) return;
       this.settlePayload(requestId, true);
       void this.handlers?.onPayloadOpen(requestId);
     };
     channel.onmessage = (event) => {
+      if (this.closed) return;
       if (!(event.data instanceof ArrayBuffer)) return;
       if (this.payloads.get(requestId) !== channel) return;
       const bytes = new Uint8Array(event.data);
@@ -459,11 +478,14 @@ export class PeerLink {
     if (this.ignoringOffer) return;
 
     await pc.setRemoteDescription(description);
+    if (this.closed || this.pc !== pc) return;
     for (const candidate of this.pendingCandidates.splice(0)) {
       await pc.addIceCandidate(candidate);
+      if (this.closed || this.pc !== pc) return;
     }
     if (description.type === "offer") {
       await pc.setLocalDescription();
+      if (this.closed || this.pc !== pc) return;
       const answer = pc.localDescription;
       if (!answer) return;
       assertHostOnlyDescription(answer);
@@ -473,7 +495,7 @@ export class PeerLink {
 
   sendControl(message: ChannelControl): void {
     const channel = this.control;
-    if (!channel || channel.readyState !== "open") {
+    if (this.closed || !channel || channel.readyState !== "open") {
       throw new Error("the local connection is not open");
     }
     channel.send(
@@ -567,6 +589,7 @@ export class PeerLink {
   }
 
   close(): void {
+    if (this.closed) return;
     this.closed = true;
     this.settleControl(false);
     for (const id of [...this.payloads.keys()]) this.closePayload(id);
@@ -578,6 +601,13 @@ export class PeerLink {
     }
     this.control = null;
     this.pc = null;
+    this.pendingCandidates = [];
+    this.handlers = null;
+    const onClosed = this.onClosed;
+    this.onClosed = null;
+    // Notify while this is still the registry's current link, so transfers
+    // are retired now rather than by a late event from native teardown.
+    onClosed?.();
   }
 }
 
@@ -594,7 +624,11 @@ export class LinkRegistry {
     this.scheduler = new NegotiationScheduler(async (peerId) => {
       const link = this.get(peerId);
       link.start();
-      if (!(await link.waitOpen(DISCOVERY_TIMEOUT_MS))) this.drop(peerId);
+      if (
+        !(await link.waitOpen(DISCOVERY_TIMEOUT_MS)) &&
+        this.links.get(peerId) === link
+      )
+        this.drop(peerId);
     });
   }
 

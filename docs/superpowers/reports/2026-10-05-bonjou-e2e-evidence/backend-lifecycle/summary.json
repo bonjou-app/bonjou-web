@@ -1,0 +1,61 @@
+{
+  "race": {
+    "command": "go test -race -count=1 -json ./...",
+    "baseline_head": "65453d91d793e70001c2a4d06602d410c700f0ad",
+    "tested_source_sha256": {
+      "internal/relay/room.go": "f18281f0cbe3e476945e38d651257c5605f9840a686b852cb9a7ca5ba28aabff",
+      "internal/relay/conn.go": "028eccb760aaa2a5569ba35f830372e21826a1c288e3aa1a532befe13aad00ba",
+      "internal/relay/room_test.go": "a8b98075842aae895184f0d3a80554d37bf69fc7f9dc6155222e031210914443"
+    },
+    "exit_code": 0,
+    "seconds": 5.96,
+    "passed_test_events": 152,
+    "passed_top_level_tests": 119,
+    "top_level_test_events": 120,
+    "skipped_tests": [
+      {
+        "package": "github.com/bonjou-app/bonjou-cli/internal/commands",
+        "test": "TestUnescapeShellPathLeavesWindowsSeparatorsAlone"
+      }
+    ],
+    "tested_packages": [
+      "github.com/bonjou-app/bonjou-cli/internal/network",
+      "github.com/bonjou-app/bonjou-cli/internal/ui",
+      "github.com/bonjou-app/bonjou-cli/internal/relay",
+      "github.com/bonjou-app/bonjou-cli/internal/queue",
+      "github.com/bonjou-app/bonjou-cli/internal/commands"
+    ],
+    "failures": [],
+    "log": "/tmp/bonjou-backend-lifecycle-2026-10-05/race.jsonl",
+    "stderr": "/tmp/bonjou-backend-lifecycle-2026-10-05/race.stderr.log"
+  },
+  "vet": {
+    "command": "go vet ./...",
+    "exit_code": 0,
+    "seconds": 1.15,
+    "log": "/tmp/bonjou-backend-lifecycle-2026-10-05/vet.log"
+  },
+  "lint": {
+    "command": "golangci-lint run ./...",
+    "exit_code": 0,
+    "seconds": 2.01,
+    "log": "/tmp/bonjou-backend-lifecycle-2026-10-05/lint.log"
+  },
+  "gofmt": {
+    "command": "gofmt -l <all tracked Go files>",
+    "exit_code": 0,
+    "tracked_go_files": 63,
+    "unformatted": [],
+    "log": "/tmp/bonjou-backend-lifecycle-2026-10-05/gofmt.log"
+  },
+  "baseline_regression": {
+    "head": "65453d91d793e70001c2a4d06602d410c700f0ad",
+    "expected_exit_code": 1,
+    "log": "/tmp/bonjou-backend-lifecycle-2026-10-05/before-fix.log"
+  },
+  "changed_files": [
+    "internal/relay/conn.go",
+    "internal/relay/room.go",
+    "internal/relay/room_test.go"
+  ]
+}

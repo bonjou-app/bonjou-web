@@ -1,0 +1,7 @@
+lan Alice-1 diagnostics: {"sockets":[{"id":1,"sent":{"hello":1,"signal":4,"create":1},"received":{"joined":1,"roster":4,"signal":4,"created":1},"rosterCount":1,"closed":false}],"pageErrors":[{"name":"SecurityError","category":"other"}],"peers":[{"id":1,"connection":"closed","ice":"closed","gathering":"complete","signaling":"closed","candidates":{"local":{"host/mdns":1,"end/none":1},"remote":{"host/mdns":1}}},{"id":2,"connection":"connected","ice":"connected","gathering":"complete","signaling":"stable","candidates":{"local":{"host/mdns":1,"end/none":1},"remote":{"host/mdns":1}}}]}
+lan Bob-1 diagnostics: {"sockets":[{"id":1,"sent":{"hello":1,"signal":4,"join":1},"received":{"joined":2,"roster":3,"signal":4,"peer_left":1},"rosterCount":1,"closed":false}],"pageErrors":[{"name":"SecurityError","category":"other"}],"peers":[{"id":1,"connection":"closed","ice":"closed","gathering":"complete","signaling":"closed","candidates":{"local":{"host/mdns":1,"end/none":1},"remote":{"host/mdns":1}}},{"id":2,"connection":"connected","ice":"connected","gathering":"complete","signaling":"stable","candidates":{"local":{"host/mdns":1,"end/none":1},"remote":{"host/mdns":1}}}]}
+locator.waitFor: Timeout 20000ms exceeded.
+Call log:
+  - waiting for getByText('Bob', { exact: true }).first() to be visible
+
+    at main (/home/runner/work/bonjou-web/bonjou-web/scripts/e2e-lan.mjs:121:8)

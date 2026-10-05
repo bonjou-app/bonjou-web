@@ -77,7 +77,7 @@ describe("candidate negotiation scheduler", () => {
 });
 
 import { vi, afterEach } from "vitest";
-import { PeerLink } from "./webrtc";
+import { LinkRegistry, PeerLink, type ChannelHandlers } from "./webrtc";
 
 class TestChannel extends EventTarget {
   readyState = "open";
@@ -132,6 +132,163 @@ function testLink(onPayloadData = async () => {}) {
   return { link, id, control, payload, opening, closed };
 }
 afterEach(() => vi.unstubAllGlobals());
+
+function controlledConnections() {
+  const connections: TestConnection[] = [];
+  class TestConnection {
+    connectionState = "new";
+    channels: TestChannel[] = [];
+    onconnectionstatechange?: () => void;
+    ondatachannel?: (event: { channel: TestChannel }) => void;
+
+    constructor() {
+      connections.push(this);
+    }
+
+    createDataChannel(label: string) {
+      const channel = new TestChannel(label);
+      channel.readyState = "connecting";
+      this.channels.push(channel);
+      return channel;
+    }
+
+    close() {
+      this.connectionState = "closed";
+      // Native teardown events can be dispatched after a replacement exists.
+    }
+  }
+  vi.stubGlobal("RTCPeerConnection", TestConnection);
+  return connections;
+}
+
+function openControl(
+  connection: ReturnType<typeof controlledConnections>[number],
+) {
+  const control = connection.channels[0];
+  control.readyState = "open";
+  control.onopen?.();
+  return control;
+}
+
+function emptyHandlers(): ChannelHandlers {
+  return {
+    onOpen() {},
+    onControl() {},
+    onPayloadOpen() {},
+    onPayloadData() {},
+    onPayloadClosed() {},
+  };
+}
+
+describe("peer replacement lifecycle", () => {
+  it("does not let a retired discovery wait close its replacement", async () => {
+    const connections = controlledConnections();
+    const registry = new LinkRegistry(
+      () => false,
+      () => {},
+      () => {},
+    );
+    registry.discover(["peer"]);
+    const retired = registry.peek("peer");
+    expect(connections).toHaveLength(1);
+
+    registry.retain([]);
+    const replacement = registry.get("peer");
+    replacement.start();
+    openControl(connections[1]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(replacement).not.toBe(retired);
+    expect(registry.peek("peer")).toBe(replacement);
+    expect(replacement.open).toBe(true);
+    expect(connections[1].connectionState).toBe("new");
+    registry.closeAll();
+  });
+
+  it("cleans up once before replacement and ignores delayed old native events", async () => {
+    const connections = controlledConnections();
+    const profiles = new Map<string, string>();
+    const disconnected = vi.fn((peerId: string) => profiles.delete(peerId));
+    const registry = new LinkRegistry(
+      () => false,
+      () => {},
+      (link) => {
+        link.listen({
+          ...emptyHandlers(),
+          onControl(message) {
+            if (message.t === "profile")
+              profiles.set(link.peerId, message.name);
+          },
+        });
+        link.onDisconnect(() => disconnected(link.peerId));
+      },
+    );
+    const retired = registry.get("peer");
+    retired.start();
+    const oldControl = openControl(connections[0]);
+    const delayedClose = oldControl.onclose;
+    const delayedMessage = oldControl.onmessage;
+    const delayedStateChange = connections[0].onconnectionstatechange;
+    oldControl.onmessage?.({
+      data: JSON.stringify({ t: "profile", name: "Retired" }),
+    });
+    registry.drop("peer");
+    expect(disconnected).toHaveBeenCalledTimes(1);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(profiles.size).toBe(0);
+
+    const replacement = registry.get("peer");
+    replacement.start();
+    const control = openControl(connections[1]);
+    control.onmessage?.({
+      data: JSON.stringify({ t: "profile", name: "Replacement" }),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(profiles.get("peer")).toBe("Replacement");
+
+    delayedClose?.();
+    delayedStateChange?.();
+    delayedMessage?.({
+      data: JSON.stringify({ t: "profile", name: "Late retired profile" }),
+    });
+    retired.close();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(disconnected).toHaveBeenCalledTimes(1);
+    expect(profiles.get("peer")).toBe("Replacement");
+    expect(replacement.open).toBe(true);
+    registry.closeAll();
+  });
+
+  it("reports current native failure once and closes active payloads immediately", async () => {
+    const connections = controlledConnections();
+    const link = new PeerLink("peer", false, () => {});
+    const closed = vi.fn();
+    const disconnected = vi.fn();
+    link.listen({ ...emptyHandlers(), onPayloadClosed: closed });
+    link.onDisconnect(disconnected);
+    link.start();
+    const control = openControl(connections[0]);
+    const opening = link.openPayload("0123456789abcdef");
+    const payload = connections[0].channels[1];
+    payload.readyState = "open";
+    payload.onopen?.();
+    await opening;
+
+    connections[0].connectionState = "failed";
+    connections[0].onconnectionstatechange?.();
+    control.onclose?.();
+    link.close();
+    expect(payload.readyState).toBe("closed");
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(disconnected).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("receiver flow control", () => {
   it("waits for processed bytes even when the network has already drained", async () => {
     const { link, id, control, payload, opening } = testLink();

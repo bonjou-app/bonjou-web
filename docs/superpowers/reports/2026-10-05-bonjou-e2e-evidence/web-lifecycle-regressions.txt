@@ -1,0 +1,28 @@
+Bonjou browser lifecycle regression verification, 2026-10-05.
+Source: /Users/hamzawahab/Developer/bonjou-web.
+
+Before implementation, npm test -- src/share/webrtc.test.ts:
+Test Files 1 failed (1); Tests 2 failed | 7 passed (9).
+
+Captured failure excerpts:
+FAIL peer replacement lifecycle > does not let a retired discovery wait close its replacement
+AssertionError: expected undefined to be PeerLink{ peerId: 'peer', ... }
+expect(registry.peek("peer")).toBe(replacement)
+
+FAIL peer replacement lifecycle > cleans up once before replacement and ignores delayed old native events
+AssertionError: expected 1 to be +0
+expect(profiles.size).toBe(0)
+
+The third regression was refined to simulate native connection failure before implementation.
+
+After implementation, npm test -- src/share/webrtc.test.ts:
+Test Files 1 passed (1); Tests 9 passed (9).
+Start at 11:37:28; Duration 181ms.
+
+After implementation, npm test:
+Test Files 12 passed (12); Tests 96 passed (96).
+Start at 11:37:48; Duration 813ms.
+
+git diff --check: exit 0, no output.
+./node_modules/.bin/tsc --noEmit --project tsconfig.json: exit 0, no output.
+No browser test or dist rebuild performed by this agent.

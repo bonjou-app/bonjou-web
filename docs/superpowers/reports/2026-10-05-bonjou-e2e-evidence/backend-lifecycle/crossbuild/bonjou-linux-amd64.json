@@ -1,0 +1,27 @@
+{
+  "head": "df923b6d5440b037212c2dbb3a08456d46e1c488",
+  "target": {
+    "name": "bonjou",
+    "os": "linux",
+    "arch": "amd64"
+  },
+  "command": [
+    "go",
+    "build",
+    "-trimpath",
+    "-o",
+    "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-linux-amd64",
+    "./cmd/bonjou"
+  ],
+  "env": {
+    "CGO_ENABLED": "0",
+    "GOOS": "linux",
+    "GOARCH": "amd64"
+  },
+  "exit_code": 0,
+  "seconds": 2.55,
+  "artifact": "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-linux-amd64",
+  "log": "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-linux-amd64.log",
+  "sha256": "2c9c32f984c7f87cd467c8aa0cae1fe0888ac727be07d08daa2974a889131e09",
+  "bytes": 9642395
+}

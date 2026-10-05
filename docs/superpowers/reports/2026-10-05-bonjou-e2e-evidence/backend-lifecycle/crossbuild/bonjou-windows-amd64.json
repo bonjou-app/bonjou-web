@@ -1,0 +1,27 @@
+{
+  "head": "df923b6d5440b037212c2dbb3a08456d46e1c488",
+  "target": {
+    "name": "bonjou",
+    "os": "windows",
+    "arch": "amd64"
+  },
+  "command": [
+    "go",
+    "build",
+    "-trimpath",
+    "-o",
+    "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-windows-amd64.exe",
+    "./cmd/bonjou"
+  ],
+  "env": {
+    "CGO_ENABLED": "0",
+    "GOOS": "windows",
+    "GOARCH": "amd64"
+  },
+  "exit_code": 0,
+  "seconds": 2.79,
+  "artifact": "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-windows-amd64.exe",
+  "log": "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-windows-amd64.log",
+  "sha256": "3d636419955e89b28d4bc2137034b7ea5e9290960380f0095b54daea4ddb7a29",
+  "bytes": 10011136
+}

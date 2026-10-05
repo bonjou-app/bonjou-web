@@ -1,7 +1,7 @@
 # Bonjou comprehensive verification
 
 Date: 2026-10-05. Canonical web candidate based on `59e2f8a7fd3a`; canonical
-coordinator code tested at `2e96dbf059a2727cd7e1e54381a8146dae43d497`.
+coordinator code tested at `df923b6d5440b037212c2dbb3a08456d46e1c488`.
 
 ## Result and repository integration
 
@@ -32,18 +32,20 @@ the legacy combined checkout; this report records the canonical repositories.
 
 ## Verification evidence
 
-[All attempts and timings](2026-10-05-bonjou-e2e-evidence/results.json) include
+[Initial attempts and timings](2026-10-05-bonjou-e2e-evidence/results.json) include
 failures rather than overwriting them. Individual suite logs are in the same
 directory. Suites ran sequentially against the production preview at
 `http://127.0.0.1:4173`, configured for the local signaling coordinator at
 `http://127.0.0.1:46330`. Independent browsers use native WebRTC and crypto;
 no ICE, mDNS, protocol framing, or production timeout was changed to pass tests.
-The final navigation fix was followed by fresh UI and boundary suites in both
-engines. The fresh PR CI suite exercises the complete committed tree.
+The final lifecycle fixes were followed by all 17 checks again, with every
+check passing against the updated coordinator. [Final sequential results and
+logs](2026-10-05-bonjou-e2e-evidence/lifecycle-final/results.json) record that run.
+The fresh PR CI suite exercises the complete committed tree.
 
 | Check                         | Local result and demonstrated behavior                                                                                                                                                                                                                                                                                                                                                                |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web unit/protocol tests       | 12 files, 93 tests pass; Go/browser known-answer vectors match canonical provenance. No wire-format changes.                                                                                                                                                                                                                                                                                          |
+| Web unit/protocol tests       | 12 files, 96 tests pass; Go/browser known-answer vectors match canonical provenance. No wire-format changes.                                                                                                                                                                                                                                                                                          |
 | Dependency/build checks       | Clean `npm ci`, zero `npm audit --audit-level=moderate` vulnerabilities, TypeScript and production Vite build pass.                                                                                                                                                                                                                                                                                   |
 | UI: Chrome and WebKit         | Light/dark 320–1440px layouts, actual Satoshi font, navigation, onboarding, settings, palette, rooms, mobile controls.                                                                                                                                                                                                                                                                                |
 | Motion: Chrome and WebKit     | Real playback, approval sequence, pause/resume/replay, keyboard focus, offscreen pause, live reduced-motion changes, pointer tilt. All pages capture console/page errors.                                                                                                                                                                                                                             |
@@ -57,7 +59,7 @@ engines. The fresh PR CI suite exercises the complete committed tree.
 | Mixed Chrome ↔ WebKit         | Bidirectional chat, matching independently checked fingerprints, approval before reads/downloads, SHA-256 and exact downloads, declines both ways, no HTTP payload writes, departure preserves private drafts/staging and disables departed targets.                                                                                                                                                  |
 | Boundaries: Chrome and WebKit | Genuine 0-byte/2 MiB native lab downloads; receiver-corruption rejection and clean retry; unchanged 20-second deadline and retry; unmount closes peer connections/channels and revokes Blob URLs; all ten artwork variants decode; system/manual/persisted theme; navigation resizing. Real single/multiline clipboard round-trips run in Chrome; WebKit grant is unsupported and explicitly skipped. |
 | Coordinator smoke             | Health, network-scoped rooms, roster without profile names, equal derived signaling keys, opaque encrypted signaling preserved, legacy payload frames rejected, HTTP payload route returns 404.                                                                                                                                                                                                       |
-| Go race/vet/lint/format       | Fresh uncached race suite: 115 top-level passes across five packages, one Windows-only skip on macOS; vet and golangci-lint pass; all 63 tracked Go files formatted. [Raw logs and count summary](2026-10-05-bonjou-e2e-evidence/backend/summary.json).                                                                                                                                               |
+| Go race/vet/lint/format       | Fresh uncached race suite: 119 top-level passes across five packages, one Windows-only skip on macOS; vet and golangci-lint pass; all 63 tracked Go files formatted. [Raw logs and count summary](2026-10-05-bonjou-e2e-evidence/backend-lifecycle/summary.json).                                                                                                                                     |
 | Cross-builds                  | CLI Linux amd64/arm64, macOS arm64, Windows amd64; coordinator Linux amd64/arm64 compile. Local cross-builds do not establish runtime behavior. GitHub CI runs Go tests on Linux, macOS, and Windows.                                                                                                                                                                                                 |
 
 ## Findings and corrections
@@ -125,6 +127,41 @@ engines. The fresh PR CI suite exercises the complete committed tree.
    `runner.temp` in job-level `env`. GitHub only makes that context available
    at step level. The install and verification steps now set the same cache
    path in their own environments. This attempt supplied no browser results.
+
+10. Run [37272364003](https://github.com/bonjou-app/bonjou-web/actions/runs/37272364003)
+    passed the web build/unit job and all seven macOS checks, including native
+    WebKit sharing and mixed-engine downloads. The hosted permission adjustment
+    is now verified for that environment. Linux Chrome passed initial discovery
+    and chat, then timed out showing the peer after both clients joined a room.
+    Passive diagnostics show both replacement control channels open, connected
+    ICE, and successfully applied native descriptions/candidates. This failure
+    is after transport establishment. [Both platforms' results and the Linux
+    failure captures](2026-10-05-bonjou-e2e-evidence/ci-fourth-run) are retained.
+
+11. Review found a coordinator lifecycle race: after the last peer left, a
+    concurrent join could attach to the room before a delayed cleanup removed
+    it from the Hub. Future peers would join a separate room under the same key.
+    A deterministic reproduction fails on the earlier coordinator. Lookup and
+    membership now share the Hub critical section with removal/retirement;
+    cleanup also checks the exact room pointer and emptiness. Four regression
+    tests cover stale cleanup, replacement rooms, code-room authorization and
+    both operation orderings. The fresh race suite passes 119 top-level tests
+    (152 including subtests), with the existing Windows-only skip on macOS.
+    [Before/after evidence](2026-10-05-bonjou-e2e-evidence/backend-lifecycle)
+    establishes this defect independently of the hosted browser failure.
+
+12. Browser review reproduced two separate lifecycle failures: an old discovery
+    wait could close a replacement link, and a queued profile from a retired
+    channel could repopulate peer state. PeerLink teardown is now terminal and
+    notifies once synchronously; delayed events and old queued controls are
+    ignored. Expiry checks the exact awaited link, and session callbacks check
+    current-link identity. Three regressions pass; the full unit suite is now
+    96 tests. [Captured before/after results](2026-10-05-bonjou-e2e-evidence/web-lifecycle-regressions.txt)
+    prove these defects, without claiming they caused the fourth hosted run.
+    Passive diagnostics now count public control-message kinds. A genuine
+    two-browser exchange confirms one sent/received profile per client and
+    excludes names, message bodies, keys, SDP, and raw addresses from the
+    [observer proof](2026-10-05-bonjou-e2e-evidence/rtc-control-observer-proof.json).
 
 ## Current captures
 

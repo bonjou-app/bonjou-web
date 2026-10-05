@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: bonjou-app/bonjou-cli
-          ref: 2e96dbf059a2727cd7e1e54381a8146dae43d497
+          ref: df923b6d5440b037212c2dbb3a08456d46e1c488
           path: .e2e-cli
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

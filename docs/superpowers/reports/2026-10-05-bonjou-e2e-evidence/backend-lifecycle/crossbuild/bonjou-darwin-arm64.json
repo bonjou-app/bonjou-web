@@ -1,0 +1,27 @@
+{
+  "head": "df923b6d5440b037212c2dbb3a08456d46e1c488",
+  "target": {
+    "name": "bonjou",
+    "os": "darwin",
+    "arch": "arm64"
+  },
+  "command": [
+    "go",
+    "build",
+    "-trimpath",
+    "-o",
+    "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-darwin-arm64",
+    "./cmd/bonjou"
+  ],
+  "env": {
+    "CGO_ENABLED": "0",
+    "GOOS": "darwin",
+    "GOARCH": "arm64"
+  },
+  "exit_code": 0,
+  "seconds": 2.86,
+  "artifact": "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-darwin-arm64",
+  "log": "/tmp/bonjou-lifecycle-crossbuild-2026-10-05/bonjou-darwin-arm64.log",
+  "sha256": "d1902b41aff567f86f0d3e847a629d538bf9cd04b785d8bce0125a3b42ea7a74",
+  "bytes": 9164194
+}
