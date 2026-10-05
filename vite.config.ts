@@ -1,13 +1,32 @@
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 
 import { isApplicationUrl, renderMetadata } from "./src/share/seo.ts";
+import { resolveCoordinatorBase } from "./src/share/coordinatorConfig.ts";
 
 const entry = (name: string) => fileURLToPath(new URL(name, import.meta.url));
+
+function buildRevision(): string | undefined {
+  let value = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
+  if (!value) {
+    try {
+      value = execFileSync("git", ["rev-parse", "HEAD"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+    } catch {
+      // Source archives can still build; exact-revision deployment checks
+      // require the hosting platform to provide its source revision.
+      return undefined;
+    }
+  }
+  return /^[a-f0-9]{40}$/i.test(value) ? value.toLowerCase() : undefined;
+}
 
 /**
  * Mirrors the rewrites in vercel.json.
@@ -49,8 +68,26 @@ function applicationRewrite(preview: boolean) {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), tailwindcss(), rewrites()],
+export default defineConfig(({ mode }) => ({
+  plugins: [
+    react(), tailwindcss(), rewrites(),
+    {
+      name: "bonjou-public-coordinator-config",
+      generateBundle() {
+        // This public URL is already embedded in browser JS. Recording it
+        // makes postdeployment checks exercise the endpoint actually shipped.
+        this.emitFile({
+          type: "asset",
+          fileName: "coordinator-config.json",
+          source: JSON.stringify({
+            version: 1,
+            revision: buildRevision(),
+            coordinator: resolveCoordinatorBase(loadEnv(mode, process.cwd(), "VITE_").VITE_COORDINATOR_URL),
+          }) + "\n",
+        });
+      },
+    },
+  ],
   resolve: { alias: { "@": entry("src") } },
   build: {
     // Preserve Vite 6's syntax targets across the bundler upgrade.
@@ -65,4 +102,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

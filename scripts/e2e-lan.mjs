@@ -59,6 +59,18 @@ async function openRoom(page) {
   const code = page.locator(".room-code code");
   await code.waitFor();
   const value = (await code.textContent()).trim();
+  const qr = page.getByRole("img", {
+    name: `QR code to join room ${value}`,
+    exact: true,
+  });
+  await qr.waitFor({ state: "visible" });
+  assert(
+    (await qr.locator("path").last().getAttribute("d"))?.length > 0,
+    "room invite QR code has no rendered modules",
+  );
+  await page.getByRole("dialog").screenshot({
+    path: join(OUTPUT, "room-invite-qr.png"),
+  });
   await page.keyboard.press("Escape");
   return value;
 }
@@ -263,7 +275,7 @@ async function main() {
     }
 
     console.log(
-      `LAN E2E passed: discovery, chat, room ${roomCode}, isolation, desktop/mobile approval, decline, exact bytes`,
+      `LAN E2E passed: discovery, chat, room ${roomCode}, QR invite, isolation, desktop/mobile approval, decline, exact bytes`,
     );
   } catch (error) {
     await diagnostics.captureFailure(error).catch(() => {

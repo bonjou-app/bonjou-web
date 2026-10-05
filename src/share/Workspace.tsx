@@ -455,6 +455,7 @@ export function Workspace(props: WorkspaceProps) {
         }}
         pending={session.roomPending}
         error={session.roomError}
+        status={session.status}
       />
 
       <SettingsPanel

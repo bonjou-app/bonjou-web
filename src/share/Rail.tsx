@@ -55,6 +55,7 @@ const STATUS_TEXT: Record<ConnectionStatus, string> = {
   connecting: "Connecting",
   connected: "Connected",
   reconnecting: "Reconnecting",
+  unavailable: "Service unavailable",
   closed: "Offline",
 };
 
@@ -281,13 +282,26 @@ export function Rail(props: RailProps) {
             className="rail-empty mt-6 border-0 bg-transparent shadow-none"
           >
             <AlertDescription>
-              {status === "closed" || status === "reconnecting" ? (
+              {status === "unavailable" ? (
+                <>
+                  <p className="bj-label is-warn">Service unavailable</p>
+                  <p>
+                    Bonjou cannot reach its connection service. Finding people
+                    and opening rooms need this service. Retrying automatically.
+                  </p>
+                </>
+              ) : status === "closed" || status === "reconnecting" ? (
                 <>
                   <p className="bj-label is-warn">Offline</p>
                   <p>
                     Reconnecting. Interrupted transfers need to be sent again.
                     Check your downloads for partial files.
                   </p>
+                </>
+              ) : status !== "connected" ? (
+                <>
+                  <p className="bj-label">Connecting to Bonjou</p>
+                  <p>Finding people starts when the connection is ready.</p>
                 </>
               ) : networkGrouped ? (
                 <>

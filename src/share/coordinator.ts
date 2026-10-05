@@ -27,7 +27,15 @@ export interface Peer {
 export type Candidate = Omit<Peer, "name">;
 
 export type ConnectionStatus =
-  "idle" | "connecting" | "connected" | "reconnecting" | "closed";
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "unavailable"
+  | "closed";
+
+export const ROOM_CONNECTION_UNAVAILABLE =
+  "Bonjou's connection service is unavailable. Room codes and QR invites will work when it reconnects. Retrying automatically.";
 
 export type CoordinatorEvent =
   | { type: "status"; status: ConnectionStatus }
@@ -57,16 +65,27 @@ interface ServerFrame {
   message?: string;
 }
 
+interface PeerContext {
+  peer: Candidate;
+  socket: WebSocket;
+  generation: number;
+  room: string;
+}
+
 const RECONNECT_BASE_MS = 500;
 const RECONNECT_MAX_MS = 15_000;
+const CONNECT_TIMEOUT_MS = 10_000;
 
 export class CoordinatorClient {
   private socket: WebSocket | null = null;
+  private connectionGeneration = 0;
   private handlers = new Set<Handler>();
   private sharedSecrets = new Map<string, Uint8Array>();
   private roster = new Map<string, Candidate>();
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
+  private unavailable = false;
   private closedByUser = false;
   private saidHello = false;
   private pendingIntent: { action: "create" | "join"; code?: string } | null =
@@ -98,19 +117,51 @@ export class CoordinatorClient {
   }
 
   connect(): void {
+    if (this.socket) return;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.closedByUser = false;
+    this.connectionGeneration += 1;
     this.emit({
       type: "status",
-      status: this.reconnectAttempt === 0 ? "connecting" : "reconnecting",
+      status: this.unavailable
+        ? "unavailable"
+        : this.reconnectAttempt === 0
+          ? "connecting"
+          : "reconnecting",
     });
 
     this.socketRoom = "";
     this.lobbyPeerId = "";
-    const socket = new WebSocket(this.url);
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(this.url);
+    } catch {
+      this.unavailable = true;
+      this.scheduleReconnect();
+      return;
+    }
     this.socket = socket;
+    let opened = false;
+    this.connectTimer = setTimeout(() => {
+      if (this.socket !== socket || this.closedByUser) return;
+      this.clearConnectTimer();
+      // Retire this socket before closing it: its delayed events must not
+      // replace the status or room scope of a newer connection.
+      this.socket = null;
+      this.clearCandidates();
+      this.unavailable = true;
+      socket.close();
+      this.scheduleReconnect();
+    }, CONNECT_TIMEOUT_MS);
 
     socket.onopen = () => {
       if (this.socket !== socket || this.closedByUser) return;
+      this.clearConnectTimer();
+      opened = true;
+      this.unavailable = false;
       this.reconnectAttempt = 0;
       this.emit({ type: "status", status: "connected" });
       this.awaitingRoom = Boolean(this.pendingIntent || this.confirmedRoom);
@@ -128,20 +179,34 @@ export class CoordinatorClient {
 
     socket.onclose = () => {
       if (this.socket !== socket) return;
+      this.clearConnectTimer();
       this.socket = null;
-      this.roster.clear();
-      this.sharedSecrets.clear();
-      this.emit({ type: "roster", peers: [] });
+      this.clearCandidates();
       if (this.closedByUser) {
         this.emit({ type: "status", status: "closed" });
         return;
       }
+      if (!opened) this.unavailable = true;
       this.scheduleReconnect();
     };
 
     socket.onerror = () => {
       // onclose follows and owns reconnection.
     };
+  }
+
+  private clearConnectTimer(): void {
+    if (this.connectTimer === null) return;
+    clearTimeout(this.connectTimer);
+    this.connectTimer = null;
+  }
+
+  private clearCandidates(): void {
+    // Crypto promises can finish after this socket and its peers retire.
+    this.connectionGeneration += 1;
+    this.roster.clear();
+    this.sharedSecrets.clear();
+    this.emit({ type: "roster", peers: [] });
   }
 
   private scheduleReconnect(): void {
@@ -151,7 +216,10 @@ export class CoordinatorClient {
       RECONNECT_MAX_MS,
     );
     this.reconnectAttempt += 1;
-    this.emit({ type: "status", status: "reconnecting" });
+    this.emit({
+      type: "status",
+      status: this.unavailable ? "unavailable" : "reconnecting",
+    });
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
@@ -160,17 +228,48 @@ export class CoordinatorClient {
 
   close(): void {
     this.closedByUser = true;
+    this.clearConnectTimer();
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.socket?.close();
+    const socket = this.socket;
     this.socket = null;
+    this.clearCandidates();
+    socket?.close();
+    this.emit({ type: "status", status: "closed" });
   }
 
   private send(frame: Record<string, unknown>): void {
     if (this.socket?.readyState !== WebSocket.OPEN) return;
     this.socket.send(JSON.stringify(frame));
+  }
+
+  private peerContext(peerId: string): PeerContext {
+    const peer = this.roster.get(peerId);
+    const socket = this.socket;
+    if (!peer || !socket) throw new Error("that peer is no longer nearby");
+    const context = {
+      peer,
+      socket,
+      generation: this.connectionGeneration,
+      room: this.socketRoom,
+    };
+    if (!this.peerIsCurrent(context))
+      throw new Error("that peer is no longer nearby");
+    return context;
+  }
+
+  private peerIsCurrent(context: PeerContext): boolean {
+    return (
+      !this.closedByUser &&
+      !this.awaitingRoom &&
+      this.socket === context.socket &&
+      context.socket.readyState === WebSocket.OPEN &&
+      this.connectionGeneration === context.generation &&
+      this.socketRoom === context.room &&
+      this.roster.get(context.peer.id) === context.peer
+    );
   }
 
   hello(): void {
@@ -207,7 +306,10 @@ export class CoordinatorClient {
     to: string,
     signal: { kind: string; payload: string },
   ): Promise<void> {
+    const context = this.peerContext(to);
     const shared = await this.sharedWith(to);
+    if (!this.peerIsCurrent(context))
+      throw new Error("that peer is no longer nearby");
     const envelope: Envelope = {
       kind: signal.kind,
       from: "",
@@ -220,22 +322,26 @@ export class CoordinatorClient {
       checksum: "",
       hmac: "",
     };
+    const payload = await sealEnvelope(envelope, shared);
+    if (!this.peerIsCurrent(context))
+      throw new Error("that peer is no longer nearby");
     this.send({
       type: "signal",
       to,
-      payload: await sealEnvelope(envelope, shared),
+      payload,
     });
   }
 
   async sharedWith(peerId: string): Promise<Uint8Array> {
+    const context = this.peerContext(peerId);
     const cached = this.sharedSecrets.get(peerId);
     if (cached) return cached;
-    const peer = this.roster.get(peerId);
-    if (!peer) throw new Error("that peer is no longer nearby");
     const shared = await deriveSharedSecret(
       this.identity.privateKey,
-      fromHex(peer.pubkey),
+      fromHex(context.peer.pubkey),
     );
+    if (!this.peerIsCurrent(context))
+      throw new Error("that peer is no longer nearby");
     this.sharedSecrets.set(peerId, shared);
     return shared;
   }
@@ -282,23 +388,44 @@ export class CoordinatorClient {
       case "roster": {
         if (this.awaitingRoom) break;
         const peers = frame.peers ?? [];
-        const present = new Set(peers.map((peer) => peer.id));
+        const roster = new Map(
+          peers.map((peer) => {
+            const previous = this.roster.get(peer.id);
+            // An unchanged peer survives roster broadcasts when others join.
+            if (
+              previous?.pubkey === peer.pubkey &&
+              previous.source === peer.source
+            )
+              return [peer.id, previous] as const;
+            this.sharedSecrets.delete(peer.id);
+            return [peer.id, peer] as const;
+          }),
+        );
         for (const id of [...this.sharedSecrets.keys()]) {
-          if (!present.has(id)) this.sharedSecrets.delete(id);
+          if (!roster.has(id)) this.sharedSecrets.delete(id);
         }
-        this.roster = new Map(peers.map((peer) => [peer.id, peer]));
-        this.emit({ type: "roster", peers });
+        this.roster = roster;
+        this.emit({ type: "roster", peers: [...roster.values()] });
         break;
       }
 
       case "signal": {
         const from = frame.from ?? "";
         if (!frame.payload) return;
+        let context: PeerContext;
+        try {
+          context = this.peerContext(from);
+        } catch {
+          return;
+        }
         try {
           const shared = await this.sharedWith(from);
+          if (!this.peerIsCurrent(context)) return;
           const envelope = await openEnvelope(frame.payload, shared);
+          if (!this.peerIsCurrent(context)) return;
           this.emit({ type: "signal", from, envelope });
         } catch (err) {
+          if (!this.peerIsCurrent(context)) return;
           this.emit({
             type: "error",
             code: "decrypt_failed",
@@ -308,9 +435,13 @@ export class CoordinatorClient {
         break;
       }
 
-      case "peer_left":
-        this.emit({ type: "peerLeft", peerId: frame.peer_id ?? "" });
+      case "peer_left": {
+        const peerId = frame.peer_id ?? "";
+        this.roster.delete(peerId);
+        this.sharedSecrets.delete(peerId);
+        this.emit({ type: "peerLeft", peerId });
         break;
+      }
 
       case "error":
         if (
