@@ -26,8 +26,8 @@ import { TerminalDisplay } from "./TerminalDisplay";
  * domain. If a command here stops matching the README, the README wins.
  */
 
-const RAW = "https://raw.githubusercontent.com/bonjou-app/bonjou-cli/main";
-const REPO = "https://github.com/bonjou-app/bonjou-cli";
+const RAW = "https://raw.githubusercontent.com/kodolabs-hq/bonjou-cli/main";
+const REPO = "https://github.com/kodolabs-hq/bonjou-cli";
 const RELEASES = `${REPO}/releases/latest`;
 
 interface Recipe {

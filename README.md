@@ -7,8 +7,8 @@
 The Bonjou marketing website and browser app for encrypted chat and file sharing.
 
 - [Open Bonjou](https://bonjou.vercel.app)
-- [CLI and coordinator source](https://github.com/bonjou-app/bonjou-cli)
-- [Bonjou organization](https://github.com/bonjou-app)
+- [CLI and coordinator source](https://github.com/kodolabs-hq/bonjou-cli)
+- [kodolabs organization](https://github.com/kodolabs-hq)
 
 The homepage includes a hands-on local handoff lab, three selectable sharing
 stories, a browser/CLI setup explorer, and original paper-and-ribbon artwork.
@@ -112,7 +112,7 @@ Use the repository root as the Vercel project root. `vercel.json` defines
 headers. Keep `bonjou.vercel.app` on the existing Vercel project when changing
 the connected Git repository.
 
-The existing Vercel project is connected to `bonjou-app/bonjou-web`. Pull
+The existing Vercel project is connected to `kodolabs-hq/bonjou-web`. Pull
 requests receive preview deployments, and merges to the protected `main` branch
 deploy production after the required web CI passes. The Vercel GitHub app has
 access to this repository only.
@@ -122,7 +122,7 @@ credentials in deployment secret storage; keep end-to-end encryption keys on
 clients. The Cloudflare Workers Free adapter and portable Go coordinator both
 forward opaque WebRTC signaling and deploy separately. This web revision uses
 the signaling-only coordinator from
-`bonjou-app/bonjou-cli`. Deploy and verify the coordinator before promoting
+`kodolabs-hq/bonjou-cli`. Deploy and verify the coordinator before promoting
 the web revision. Set the public `VITE_COORDINATOR_URL` to its HTTPS base URL
 in the Vercel build environment. Application data
 travels over direct WebRTC; the former relay upload/download endpoints are
