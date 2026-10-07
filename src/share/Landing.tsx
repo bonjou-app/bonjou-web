@@ -29,7 +29,7 @@ import { BrandArtwork } from "./BrandArtwork";
 import { useLandingMotion } from "./useLandingMotion";
 import { useMediaQuery, type ResolvedTheme } from "./theme";
 
-const REPO = "https://github.com/bonjou-app/bonjou-cli";
+const REPO = "https://github.com/kodolabs-hq/bonjou-cli";
 const links = [
   ["#try", "Try a handoff"],
   ["#stories", "Made for your day"],

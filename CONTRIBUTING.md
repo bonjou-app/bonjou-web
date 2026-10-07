@@ -9,7 +9,7 @@ affected flow in a browser at desktop and mobile sizes, with keyboard access.
 Include what changed and the checks you ran in the pull request.
 
 Coordinate protocol changes with
-[bonjou-cli](https://github.com/bonjou-app/bonjou-cli). Keep the fixture source
+[bonjou-cli](https://github.com/kodolabs-hq/bonjou-cli). Keep the fixture source
 revision and checksum accurate. Public test keys are safe to commit; real user
 keys, payloads, `.env` files, and logs are not.
 
